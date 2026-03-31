@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Informatica-to-dbt Migration Assessment</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2d3748;
+    --text: #e2e8f0;
+    --muted: #a0aec0;
+    --blue: #4299e1;
+    --green: #48bb78;
+    --yellow: #ecc94b;
+    --red: #fc8181;
+    --cyan: #76e4f7;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 2rem;
+    line-height: 1.6;
+  }
+  h1 { color: var(--cyan); margin-bottom: 0.5rem; font-size: 1.8rem; }
+  h2 { color: var(--blue); margin: 2rem 0 1rem; font-size: 1.3rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+  .subtitle { color: var(--muted); margin-bottom: 2rem; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem;
+    text-align: center;
+  }
+  .card .value { font-size: 2rem; font-weight: bold; color: var(--cyan); }
+  .card .label { font-size: 0.85rem; color: var(--muted); margin-top: 0.3rem; }
+  .card.success .value { color: var(--green); }
+  .card.warning .value { color: var(--yellow); }
+  .card.error .value { color: var(--red); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+  th, td {
+    padding: 0.6rem 0.8rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th { background: var(--card); color: var(--blue); font-weight: 600; position: sticky; top: 0; }
+  tr:hover { background: rgba(66, 153, 225, 0.08); }
+  .status-success { color: var(--green); font-weight: 600; }
+  .status-partial { color: var(--yellow); font-weight: 600; }
+  .status-failed { color: var(--red); font-weight: 600; }
+  .ewi-error { background: rgba(252, 129, 129, 0.08); }
+  .ewi-warning { background: rgba(236, 201, 75, 0.08); }
+  .ewi-info { background: rgba(118, 228, 247, 0.05); }
+  .bar { display: flex; height: 24px; border-radius: 4px; overflow: hidden; margin: 0.5rem 0; }
+  .bar-success { background: var(--green); }
+  .bar-partial { background: var(--yellow); }
+  .bar-failed { background: var(--red); }
+  .legend { display: flex; gap: 1.5rem; margin: 0.5rem 0; font-size: 0.85rem; color: var(--muted); }
+  .legend span::before { content: ''; display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 0.4rem; vertical-align: middle; }
+  .legend .l-success::before { background: var(--green); }
+  .legend .l-partial::before { background: var(--yellow); }
+  .legend .l-failed::before { background: var(--red); }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.8rem; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>Informatica-to-dbt Migration Assessment</h1>
+<p class="subtitle">Generated: 2026-03-31 16:08:13 &mdash; Powered by Snowflake Cortex LLM</p>
+
+<!-- ===== Executive Summary ===== -->
+<h2>Executive Summary</h2>
+<div class="cards">
+  <div class="card"><div class="value">1</div><div class="label">Total Mappings</div></div>
+  <div class="card success"><div class="value">1</div><div class="label">Successful</div></div>
+  <div class="card warning"><div class="value">0</div><div class="label">Partial</div></div>
+  <div class="card error"><div class="value">0</div><div class="label">Failed</div></div>
+  <div class="card"><div class="value">100%</div><div class="label">Success Rate</div></div>
+  <div class="card"><div class="value">100</div><div class="label">Avg Quality</div></div>
+  <div class="card"><div class="value">24</div><div class="label">Files Generated</div></div>
+  <div class="card"><div class="value">3</div><div class="label">LLM Calls</div></div>
+</div>
+
+<!-- Conversion status bar -->
+<div class="bar">
+  <div class='bar-success' style='flex:1'></div>
+  
+  
+</div>
+<div class="legend">
+  <span class="l-success">Success (1)</span>
+  <span class="l-partial">Partial (0)</span>
+  <span class="l-failed">Failed (0)</span>
+</div>
+
+<!-- ===== EWI Summary ===== -->
+<h2>EWI Summary</h2>
+<div class="cards">
+  <div class="card error"><div class="value">0</div><div class="label">Errors (E)</div></div>
+  <div class="card warning"><div class="value">0</div><div class="label">Warnings (W)</div></div>
+  <div class="card"><div class="value">2</div><div class="label">Informational (I)</div></div>
+</div>
+
+<!-- ===== Mapping Detail ===== -->
+<h2>Mapping Detail</h2>
+<div style="overflow-x:auto;">
+<table>
+<thead>
+<tr>
+  <th>Mapping</th><th>Workflow</th><th>Complexity</th><th>Strategy</th>
+  <th>Status</th><th>Files</th><th>Errors</th><th>Warnings</th>
+  <th>Quality</th><th>LLM Calls</th><th>Heal Rounds</th><th>Time</th>
+</tr>
+</thead>
+<tbody>
+
+                <tr>
+                    <td>m_INCR_DM_DIM_EQUIPMENT</td>
+                    <td>SQL_11_ATM_INM_to_SQL_DM_Load</td>
+                    <td>87</td>
+                    <td>COMPLEX</td>
+                    <td class="status-success">SUCCESS</td>
+                    <td>24</td>
+                    <td>0</td>
+                    <td>16</td>
+                    <td>100</td>
+                    <td>3</td>
+                    <td>0</td>
+                    <td>285.8s</td>
+                </tr>
+</tbody>
+</table>
+</div>
+
+<!-- ===== EWI Detail ===== -->
+<h2>EWI Detail</h2>
+<div style="overflow-x:auto;">
+<table>
+<thead>
+<tr><th>Code</th><th>Level</th><th>Mapping</th><th>Message</th><th>Detail</th></tr>
+</thead>
+<tbody>
+
+                <tr class="ewi-info">
+                    <td>I001</td>
+                    <td>INFO</td>
+                    <td>m_INCR_DM_DIM_EQUIPMENT</td>
+                    <td>Successfully converted: m_INCR_DM_DIM_EQUIPMENT</td>
+                    <td>Generated 24 files, quality score 100/100</td>
+                </tr>
+                <tr class="ewi-info">
+                    <td>I020</td>
+                    <td>INFO</td>
+                    <td>m_INCR_DM_DIM_EQUIPMENT</td>
+                    <td>High complexity mapping: m_INCR_DM_DIM_EQUIPMENT</td>
+                    <td>Complexity score 87/100, strategy: COMPLEX</td>
+                </tr>
+</tbody>
+</table>
+</div>
+
+<!-- ===== Performance ===== -->
+<h2>Performance</h2>
+<div class="cards">
+  <div class="card"><div class="value">285.8s</div><div class="label">Total Time</div></div>
+  <div class="card"><div class="value">3</div><div class="label">LLM Calls</div></div>
+  <div class="card"><div class="value">0</div><div class="label">Heal Rounds</div></div>
+  <div class="card"><div class="value">0</div><div class="label">Est. Tokens</div></div>
+</div>
+
+<footer>
+  infa2dbt &mdash; Informatica PowerCenter to dbt Migration Framework
+  &mdash; Powered by Snowflake Cortex LLM
+</footer>
+
+</body>
+</html>

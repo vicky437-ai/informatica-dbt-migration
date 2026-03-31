@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Framework Pipeline — Informatica-to-dbt Migration</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2d3748;
+    --text: #e2e8f0;
+    --muted: #a0aec0;
+    --blue: #4299e1;
+    --green: #48bb78;
+    --yellow: #ecc94b;
+    --red: #fc8181;
+    --cyan: #76e4f7;
+    --purple: #b794f4;
+    --orange: #f6ad55;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 2rem;
+  }
+  h1 { color: var(--cyan); font-size: 1.6rem; margin-bottom: 0.5rem; text-align: center; }
+  .subtitle { color: var(--muted); text-align: center; margin-bottom: 2rem; font-size: 0.9rem; }
+
+  .pipeline { display: flex; flex-direction: column; gap: 1.5rem; max-width: 900px; margin: 0 auto; }
+
+  .stage {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem 1.5rem;
+    position: relative;
+  }
+  .stage::after {
+    content: '';
+    position: absolute;
+    bottom: -1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    height: 1.5rem;
+    background: var(--border);
+  }
+  .stage:last-child::after { display: none; }
+
+  .stage-header {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 0.8rem;
+  }
+  .stage-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+  }
+  .stage-title { font-weight: 600; font-size: 1.05rem; }
+  .stage-cli { color: var(--cyan); font-family: monospace; font-size: 0.85rem; }
+
+  .stage-body { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 2rem; font-size: 0.85rem; }
+  .stage-body dt { color: var(--muted); }
+  .stage-body dd { color: var(--text); }
+
+  .modules { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+  .mod {
+    background: rgba(66, 153, 225, 0.15);
+    border: 1px solid rgba(66, 153, 225, 0.3);
+    border-radius: 4px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.78rem;
+    font-family: monospace;
+    color: var(--blue);
+  }
+
+  .arrow { text-align: center; color: var(--border); font-size: 1.5rem; line-height: 1; }
+
+  /* Stage colors */
+  .s1 .stage-num { background: var(--blue); color: var(--bg); }
+  .s2 .stage-num { background: var(--purple); color: var(--bg); }
+  .s3 .stage-num { background: var(--green); color: var(--bg); }
+  .s4 .stage-num { background: var(--yellow); color: var(--bg); }
+  .s5 .stage-num { background: var(--orange); color: var(--bg); }
+  .s6 .stage-num { background: var(--cyan); color: var(--bg); }
+  .s7 .stage-num { background: var(--red); color: var(--bg); }
+
+  footer {
+    margin-top: 2rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+    border-top: 1px solid var(--border);
+    padding-top: 1rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>infa2dbt Framework Pipeline</h1>
+<p class="subtitle">End-to-end flow from Informatica XML to Snowflake-native dbt project</p>
+
+<div class="pipeline">
+
+  <!-- Stage 1: Discovery -->
+  <div class="stage s1">
+    <div class="stage-header">
+      <div class="stage-num">1</div>
+      <div>
+        <div class="stage-title">Discovery &amp; Inventory</div>
+        <div class="stage-cli">infa2dbt discover</div>
+      </div>
+    </div>
+    <dl class="stage-body">
+      <dt>Input</dt><dd>Informatica PowerCenter XML directory</dd>
+      <dt>Output</dt><dd>XML inventory + source schema metadata</dd>
+      <dt>Sources</dt><dd>Snowflake INFORMATION_SCHEMA, XML extraction, manual JSON</dd>
+      <dt>Key data</dt><dd>Mapping names, workflows, repositories, transformation types, source tables</dd>
+    </dl>
+    <div class="modules">
+      <span class="mod">discovery/xml_inventory.py</span>
+      <span class="mod">discovery/schema_discovery.py</span>
+    </div>
+  </div>
+
+  <!-- Stage 2: Analysis -->
+  <div class="stage s2">
+    <div class="stage-header">
+      <div class="stage-num">2</div>
+      <div>
+        <div class="stage-title">Analysis &amp; Complexity Scoring</div>
+        <div class="stage-cli">infa2dbt convert (phase 1)</div>
+      </div>
+    </div>
+    <dl class="stage-body">
+      <dt>Input</dt><dd>Parsed XML (Repository model)</dd>
+      <dt>Output</dt><dd>Complexity scores, model strategy, enriched mappings</dd>
+      <dt>Scoring</dt><dd>11 dimensions: sources, targets, transforms, lookups, expressions, etc.</dd>
+      <dt>Strategies</dt><dd>DIRECT (0-30), STAGED (31-55), LAYERED (56-80), COMPLEX (81-100)</dd>
+    </dl>
+    <div class="modules">
+      <span class="mod">analyzer/complexity.py</span>
+      <span class="mod">analyzer/multi_workflow.py</span>
+      <span class="mod">analyzer/transformation_registry.py</span>
+    </div>
+  </div>
+
+  <!-- Stage 3: Conversion -->
+  <div class="stage s3">
+    <div class="stage-header">
+      <div class="stage-num">3</div>
+      <div>
+        <div class="stage-title">LLM-Powered Conversion</div>
+        <div class="stage-cli">infa2dbt convert (phase 2)</div>
+      </div>
+    </div>
+    <dl class="stage-body">
+      <dt>Input</dt><dd>Enriched mappings + complexity analysis</dd>
+      <dt>Output</dt><dd>dbt SQL models, YAML schemas, macros, tests</dd>
+      <dt>LLM</dt><dd>Snowflake Cortex (claude-4-sonnet) with self-healing loop</dd>
+      <dt>Chunking</dt><dd>Context-preserving chunks for large mappings (128K token limit)</dd>
+    </dl>
+    <div class="modules">
+      <span class="mod">generator/llm_client.py</span>
+      <span class="mod">generator/prompt_builder.py</span>
+      <span class="mod">generator/response_parser.py</span>
+      <span class="mod">generator/post_processor.py</span>
+      <span class="mod">generator/quality_scorer.py</span>
+      <span class="mod">chunker/context_preserving.py</span>
+      <span class="mod">cache/conversion_cache.py</span>
+    </div>
+  </div>
+
+  <!-- Stage 4: Merge -->
+  <div class="stage s4">
+    <div class="stage-header">
+      <div class="stage-num">4</div>
+      <div>
+        <div class="stage-title">Project Assembly &amp; Merge</div>
+        <div class="stage-cli">infa2dbt convert --mode merge</div>
+      </div>
+    </div>
+    <dl class="stage-body">
+      <dt>Input</dt><dd>Generated files per mapping</dd>
+      <dt>Output</dt><dd>Unified dbt project with deduplicated sources</dd>
+      <dt>Key ops</dt><dd>Source consolidation, conflict resolution, project structure</dd>
+      <dt>Layers</dt><dd>staging/ (views) &rarr; intermediate/ (views) &rarr; marts/ (incremental/table)</dd>
+    </dl>
+    <div class="modules">
+      <span class="mod">merger/project_merger.py</span>
+      <span class="mod">merger/source_consolidator.py</span>
+      <span class="mod">merger/conflict_resolver.py</span>
+      <span class="mod">generator/dbt_project_generator.py</span>
+    </div>
+  </div>
+
+  <!-- Stage 5: Validate -->
+  <div class="stage s5">
+    <div class="stage-header">
+      <div class="stage-num">5</div>
+      <div>
+        <div class="stage-title">Validation</div>
+        <div class="stage-cli">infa2dbt validate</div>
+      </div>
+    </div>
+    <dl class="stage-body">
+      <dt>Input</dt><dd>Assembled dbt project</dd>
+      <dt>Output</dt><dd>Validation results (compile/run/test status)</dd>
+      <dt>Static</dt><dd>SQL syntax, YAML structure, ref/source integrity</dd>
+      <dt>Live</dt><dd>dbt compile &rarr; dbt run &rarr; dbt test (Snowflake warehouse)</dd>
+    </dl>
+    <div class="modules">
+      <span class="mod">validation/dbt_validator.py</span>
+      <span class="mod">validator/sql_validator.py</span>
+      <span class="mod">validator/yaml_validator.py</span>
+      <span class="mod">validator/project_validator.py</span>
+    </div>
+  </div>
+
+  <!-- Stage 6: Git -->
+  <div class="stage s6">
+    <div class="stage-header">
+      <div class="stage-num">6</div>
+      <div>
+        <div class="stage-title">Version Control</div>
+        <div class="stage-cli">infa2dbt git-push</div>
+      </div>
+    </div>
+    <dl class="stage-body">
+      <dt>Input</dt><dd>Validated dbt project</dd>
+      <dt>Output</dt><dd>Git commit + push to remote</dd>
+      <dt>Operations</dt><dd>init, branch, commit, push, remote management</dd>
+      <dt>Integration</dt><dd>Snowflake Git Repository for pull-from-Git deployment</dd>
+    </dl>
+    <div class="modules">
+      <span class="mod">git/git_manager.py</span>
+    </div>
+  </div>
+
+  <!-- Stage 7: Deploy -->
+  <div class="stage s7">
+    <div class="stage-header">
+      <div class="stage-num">7</div>
+      <div>
+        <div class="stage-title">Snowflake Deployment</div>
+        <div class="stage-cli">infa2dbt deploy</div>
+      </div>
+    </div>
+    <dl class="stage-body">
+      <dt>Input</dt><dd>dbt project (local or Git)</dd>
+      <dt>Output</dt><dd>Snowflake-native dbt project object + optional TASK</dd>
+      <dt>Direct</dt><dd><code>snow dbt deploy</code> &rarr; CREATE DBT PROJECT</dd>
+      <dt>Git</dt><dd>CREATE GIT REPOSITORY &rarr; CREATE DBT PROJECT FROM @repo</dd>
+    </dl>
+    <div class="modules">
+      <span class="mod">deployment/deployer.py</span>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  infa2dbt &mdash; Informatica PowerCenter to dbt Migration Framework &mdash; Powered by Snowflake Cortex LLM
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dbt Data Flow Diagram - Staging → Intermediate → Marts</title>
+<style>
+  body { margin: 0; padding: 40px; background: #f8f9fa; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+  .diagram-container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 16px; padding: 40px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+  h1 { text-align: center; color: #1a1a2e; font-size: 22px; margin-bottom: 8px; }
+  .subtitle { text-align: center; color: #666; font-size: 13px; margin-bottom: 30px; }
+</style>
+</head>
+<body>
+<div class="diagram-container">
+  <h1>dbt Model Data Flow - Layered ELT Architecture</h1>
+  <p class="subtitle">9 Informatica Mappings converted to 51 dbt models across Staging, Intermediate, and Marts layers</p>
+
+  <svg width="1120" height="900" viewBox="0 0 1120 900" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="shadow" x="-4%" y="-4%" width="108%" height="116%">
+        <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.08"/>
+      </filter>
+      <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#94A3B8"/>
+      </marker>
+      <marker id="arrB" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#29B5E8"/>
+      </marker>
+    </defs>
+
+    <!-- Column headers -->
+    <rect x="20" y="10" width="220" height="40" rx="8" fill="#E74C3C" opacity="0.1"/>
+    <text x="130" y="36" text-anchor="middle" font-size="13" font-weight="700" fill="#C0392B">SOURCES (38 tables)</text>
+
+    <rect x="270" y="10" width="240" height="40" rx="8" fill="#3498DB" opacity="0.1"/>
+    <text x="390" y="36" text-anchor="middle" font-size="13" font-weight="700" fill="#2980B9">STAGING (26 views)</text>
+
+    <rect x="540" y="10" width="260" height="40" rx="8" fill="#9B59B6" opacity="0.1"/>
+    <text x="670" y="36" text-anchor="middle" font-size="13" font-weight="700" fill="#8E44AD">INTERMEDIATE (17 views)</text>
+
+    <rect x="830" y="10" width="270" height="40" rx="8" fill="#27AE60" opacity="0.1"/>
+    <text x="965" y="36" text-anchor="middle" font-size="13" font-weight="700" fill="#229954">MARTS (8 fact/dim tables)</text>
+
+    <!-- ============== PIPELINE 1: Journals STG ============== -->
+    <text x="560" y="80" text-anchor="middle" font-size="12" font-weight="700" fill="#555" text-decoration="underline">Pipeline: BL_FF_ZJ_JOURNALS_STG</text>
+
+    <!-- Sources -->
+    <rect x="30" y="95" width="195" height="28" rx="6" fill="#FDEBD0" stroke="#E67E22" stroke-width="1" filter="url(#shadow)"/>
+    <text x="128" y="114" text-anchor="middle" font-size="10" font-weight="500" fill="#8B4513">oracle_raw.f0911 (Ledger)</text>
+
+    <rect x="30" y="130" width="195" height="28" rx="6" fill="#FDEBD0" stroke="#E67E22" stroke-width="1" filter="url(#shadow)"/>
+    <text x="128" y="149" text-anchor="middle" font-size="10" font-weight="500" fill="#8B4513">oracle_raw.f0901 (Acct Master)</text>
+
+    <rect x="30" y="165" width="195" height="28" rx="6" fill="#FDEBD0" stroke="#E67E22" stroke-width="1" filter="url(#shadow)"/>
+    <text x="128" y="184" text-anchor="middle" font-size="10" font-weight="500" fill="#8B4513">oracle_raw.f0011 (Batch Ctrl)</text>
+
+    <rect x="30" y="200" width="195" height="28" rx="6" fill="#FDEBD0" stroke="#E67E22" stroke-width="1" filter="url(#shadow)"/>
+    <text x="128" y="219" text-anchor="middle" font-size="10" font-weight="500" fill="#8B4513">oracle_raw.f0092</text>
+
+    <rect x="30" y="235" width="195" height="28" rx="6" fill="#FDEBD0" stroke="#E67E22" stroke-width="1" filter="url(#shadow)"/>
+    <text x="128" y="254" text-anchor="middle" font-size="10" font-weight="500" fill="#8B4513">oracle_raw.f01151</text>
+
+    <!-- Staging -->
+    <rect x="280" y="95" width="215" height="28" rx="6" fill="#D6EAF8" stroke="#3498DB" stroke-width="1" filter="url(#shadow)"/>
+    <text x="388" y="114" text-anchor="middle" font-size="10" font-weight="500" fill="#1A5276">stg_f0911_jnl_stg</text>
+    <rect x="280" y="130" width="215" height="28" rx="6" fill="#D6EAF8" stroke="#3498DB" stroke-width="1" filter="url(#shadow)"/>
+    <text x="388" y="149" text-anchor="middle" font-size="10" font-weight="500" fill="#1A5276">stg_f0901_jnl_stg</text>
+    <rect x="280" y="165" width="215" height="28" rx="6" fill="#D6EAF8" stroke="#3498DB" stroke-width="1" filter="url(#shadow)"/>
+    <text x="388" y="184" text-anchor="middle" font-size="10" font-weight="500" fill="#1A5276">stg_f0011_jnl_stg</text>
+    <rect x="280" y="200" width="215" height="28" rx="6" fill="#D6EAF8" stroke="#3498DB" stroke-width="1" filter="url(#shadow)"/>
+    <text x="388" y="219" text-anchor="middle" font-size="10" font-weight="500" fill="#1A5276">stg_f0092</text>
+    <rect x="280" y="235" width="215" height="28" rx="6" fill="#D6EAF8" stroke="#3498DB" stroke-width="1" filter="url(#shadow)"/>
+    <text x="388" y="254" text-anchor="middle" font-size="10" font-weight="500" fill="#1A5276">stg_f01151</text>
+
+    <!-- Intermediate -->
+    <rect x="555" y="105" width="225" height="32" rx="6" fill="#E8DAEF" stroke="#9B59B6" stroke-width="1" filter="url(#shadow)"/>
+    <text x="668" y="126" text-anchor="middle" font-size="10" font-weight="500" fill="#6C3483">int_journals_base</text>
+    <rect x="555" y="150" width="225" height="32" rx="6" fill="#E8DAEF" stroke="#9B59B6" stroke-width="1" filter="url(#shadow)"/>
+    <text x="668" y="171" text-anchor="middle" font-size="10" font-weight="500" fill="#6C3483">int_journals_reverse</text>
+    <rect x="555" y="195" width="225" height="32" rx="6" fill="#E8DAEF" stroke="#9B59B6" stroke-width="1" filter="url(#shadow)"/>
+    <text x="668" y="216" text-anchor="middle" font-size="10" font-weight="500" fill="#6C3483">int_journals_non_reverse</text>
+
+    <!-- Marts -->
+    <rect x="845" y="110" width="245" height="36" rx="8" fill="#D5F5E3" stroke="#27AE60" stroke-width="2" filter="url(#shadow)"/>
+    <text x="968" y="133" text-anchor="middle" font-size="11" font-weight="600" fill="#1E8449">fct_zj_journals_staging</text>
+    <text x="968" y="144" text-anchor="middle" font-size="8" fill="#27AE60">INCREMENTAL</text>
+
+    <rect x="845" y="160" width="245" height="36" rx="8" fill="#D5F5E3" stroke="#27AE60" stroke-width="2" filter="url(#shadow)"/>
+    <text x="968" y="183" text-anchor="middle" font-size="11" font-weight="600" fill="#1E8449">fct_zj_journals_flat_file</text>
+    <text x="968" y="194" text-anchor="middle" font-size="8" fill="#27AE60">TABLE</text>
+
+    <!-- Arrows P1 -->
+    <line x1="225" y1="109" x2="277" y2="109" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="225" y1="144" x2="277" y2="144" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="225" y1="179" x2="277" y2="179" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="225" y1="214" x2="277" y2="214" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="225" y1="249" x2="277" y2="249" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="495" y1="109" x2="552" y2="121" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="495" y1="144" x2="552" y2="121" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="495" y1="179" x2="552" y2="121" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="495" y1="214" x2="552" y2="121" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="495" y1="249" x2="552" y2="121" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="780" y1="121" x2="842" y2="128" stroke="#27AE60" stroke-width="2" marker-end="url(#arrB)"/>
+    <line x1="780" y1="166" x2="842" y2="128" stroke="#27AE60" stroke-width="2" marker-end="url(#arrB)"/>
+    <line x1="780" y1="211" x2="842" y2="128" stroke="#27AE60" stroke-width="2" marker-end="url(#arrB)"/>
+    <line x1="780" y1="166" x2="842" y2="178" stroke="#27AE60" stroke-width="2" marker-end="url(#arrB)"/>
+    <line x1="780" y1="211" x2="842" y2="178" stroke="#27AE60" stroke-width="2" marker-end="url(#arrB)"/>
+
+    <!-- ============== PIPELINE 2: Journals ============== -->
+    <line x1="20" y1="285" x2="1100" y2="285" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="560" y="310" text-anchor="middle" font-size="12" font-weight="700" fill="#555" text-decoration="underline">Pipeline: BL_FF_ZJ_JOURNALS</text>
+
+    <rect x="30" y="325" width="195" height="28" rx="6" fill="#FDEBD0" stroke="#E67E22" stroke-width="1" filter="url(#shadow)"/>
+    <text x="128" y="344" text-anchor="middle" font-size="10" font-weight="500" fill="#8B4513">oracle_raw.f0911</text>
+    <rect x="30" y="360" width="195" height="28" rx="6" fill="#FDEBD0" stroke="#E67E22" stroke-width="1" filter="url(#shadow)"/>
+    <text x="128" y="379" text-anchor="middle" font-size="10" font-weight="500" fill="#8B4513">oracle_raw.s_zj_journals</text>
+    <rect x="30" y="395" width="195" height="28" rx="6" fill="#FCE4D6" stroke="#D35400" stroke-width="1" filter="url(#shadow)"/>
+    <text x="128" y="414" text-anchor="middle" font-size="10" font-weight="500" fill="#8B4513">flat_file_raw.ff_bl_zj_journals</text>
+
+    <rect x="280" y="325" width="215" height="28" rx="6" fill="#D6EAF8" stroke="#3498DB" stroke-width="1" filter="url(#shadow)"/>
+    <text x="388" y="344" text-anchor="middle" font-size="10" font-weight="500" fill="#1A5276">stg_f0011, stg_f0901, stg_f0911</text>
+    <rect x="280" y="360" width="215" height="28" rx="6" fill="#D6EAF8" stroke="#3498DB" stroke-width="1" filter="url(#shadow)"/>
+    <text x="388" y="379" text-anchor="middle" font-size="10" font-weight="500" fill="#1A5276">stg_s_zj_journals</text>
+    <rect x="280" y="395" width="215" height="28" rx="6" fill="#D6EAF8" stroke="#3498DB" stroke-width="1" filter="url(#shadow)"/>
+    <text x="388" y="414" text-anchor="middle" font-size="10" font-weight="500" fill="#1A5276">stg_ff_bl_zj_journals_src</text>
+
+    <rect x="555" y="330" width="225" height="28" rx="6" fill="#E8DAEF" stroke="#9B59B6" stroke-width="1" filter="url(#shadow)"/>
+    <text x="668" y="349" text-anchor="middle" font-size="10" font-weight="500" fill="#6C3483">int_zj_journals_base</text>
+    <rect x="555" y="365" width="225" height="28" rx="6" fill="#E8DAEF" stroke="#9B59B6" stroke-width="1" filter="url(#shadow)"/>
+    <text x="668" y="384" text-anchor="middle" font-size="10" font-weight="500" fill="#6C3483">int_zj_journals_cleaned</text>
+    <rect x="555" y="400" width="225" height="28" rx="6" fill="#E8DAEF" stroke="#9B59B6" stroke-width="1" filter="url(#shadow)"/>
+    <text x="668" y="419" text-anchor="middle" font-size="10" font-weight="500" fill="#6C3483">int_ff_journals_with_filename</text>
+
+    <rect x="845" y="325" width="245" height="32" rx="8" fill="#D5F5E3" stroke="#27AE60" stroke-width="2" filter="url(#shadow)"/>
+    <text x="968" y="345" text-anchor="middle" font-size="11" font-weight="600" fill="#1E8449">fct_zj_journals_output (INCR)</text>
+    <rect x="845" y="365" width="245" height="32" rx="8" fill="#D5F5E3" stroke="#27AE60" stroke-width="2" filter="url(#shadow)"/>
+    <text x="968" y="385" text-anchor="middle" font-size="11" font-weight="600" fill="#1E8449">fct_ff_journals_output (TABLE)</text>
+    <rect x="845" y="405" width="245" height="32" rx="8" fill="#D5F5E3" stroke="#27AE60" stroke-width="2" filter="url(#shadow)"/>
+    <text x="968" y="425" text-anchor="middle" font-size="11" font-weight="600" fill="#1E8449">fct_ff_journals_with_filename</text>
+    <rect x="845" y="445" width="245" height="32" rx="8" fill="#D5F5E3" stroke="#27AE60" stroke-width="2" filter="url(#shadow)"/>
+    <text x="968" y="465" text-anchor="middle" font-size="11" font-weight="600" fill="#1E8449">dim_s_zj_journals_delete</text>
+
+    <!-- Arrows P2 -->
+    <line x1="225" y1="339" x2="277" y2="339" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="225" y1="374" x2="277" y2="374" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="225" y1="409" x2="277" y2="409" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="495" y1="339" x2="552" y2="344" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="495" y1="374" x2="552" y2="344" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="495" y1="409" x2="552" y2="414" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="780" y1="344" x2="842" y2="341" stroke="#27AE60" stroke-width="2" marker-end="url(#arrB)"/>
+    <line x1="780" y1="379" x2="842" y2="341" stroke="#27AE60" stroke-width="2" marker-end="url(#arrB)"/>
+    <line x1="780" y1="379" x2="842" y2="381" stroke="#27AE60" stroke-width="2" marker-end="url(#arrB)"/>
+    <line x1="780" y1="414" x2="842" y2="421" stroke="#27AE60" stroke-width="2" marker-end="url(#arrB)"/>
+    <line x1="780" y1="414" x2="842" y2="461" stroke="#27AE60" stroke-width="2" marker-end="url(#arrB)"/>
+
+    <!-- ============== PIPELINE 3: Equipment ============== -->
+    <line x1="20" y1="490" x2="1100" y2="490" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="560" y="515" text-anchor="middle" font-size="12" font-weight="700" fill="#555" text-decoration="underline">Pipeline: INCR_DM_DIM_EQUIPMENT</text>
+
+    <rect x="30" y="530" width="195" height="28" rx="6" fill="#FDEBD0" stroke="#E67E22" stroke-width="1" filter="url(#shadow)"/>
+    <text x="128" y="549" text-anchor="middle" font-size="10" font-weight="500" fill="#8B4513">8 source tables (Equipment)</text>
+
+    <rect x="280" y="530" width="215" height="28" rx="6" fill="#D6EAF8" stroke="#3498DB" stroke-width="1" filter="url(#shadow)"/>
+    <text x="388" y="549" text-anchor="middle" font-size="10" font-weight="500" fill="#1A5276">8 stg_ models (views)</text>
+
+    <rect x="555" y="530" width="225" height="28" rx="6" fill="#E8DAEF" stroke="#9B59B6" stroke-width="1" filter="url(#shadow)"/>
+    <text x="668" y="549" text-anchor="middle" font-size="10" font-weight="500" fill="#6C3483">5 int_ models (lookups, final)</text>
+
+    <rect x="845" y="530" width="245" height="32" rx="8" fill="#D5F5E3" stroke="#27AE60" stroke-width="2" filter="url(#shadow)"/>
+    <text x="968" y="551" text-anchor="middle" font-size="11" font-weight="600" fill="#1E8449">dim_equipment_soft_delete (INCR)</text>
+
+    <line x1="225" y1="544" x2="277" y2="544" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="495" y1="544" x2="552" y2="544" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="780" y1="544" x2="842" y2="544" stroke="#27AE60" stroke-width="2" marker-end="url(#arrB)"/>
+
+    <!-- ============== PIPELINE 4: Material Master ============== -->
+    <line x1="20" y1="580" x2="1100" y2="580" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="560" y="605" text-anchor="middle" font-size="12" font-weight="700" fill="#555" text-decoration="underline">Pipeline: DI_ITEM_MTRL_MASTER</text>
+
+    <rect x="30" y="620" width="195" height="28" rx="6" fill="#FDEBD0" stroke="#E67E22" stroke-width="1" filter="url(#shadow)"/>
+    <text x="128" y="639" text-anchor="middle" font-size="10" font-weight="500" fill="#8B4513">XML Material + Lookups</text>
+
+    <rect x="280" y="620" width="215" height="28" rx="6" fill="#D6EAF8" stroke="#3498DB" stroke-width="1" filter="url(#shadow)"/>
+    <text x="388" y="639" text-anchor="middle" font-size="10" font-weight="500" fill="#1A5276">stg_xml_material_attr_txt + 1</text>
+
+    <rect x="555" y="620" width="225" height="28" rx="6" fill="#E8DAEF" stroke="#9B59B6" stroke-width="1" filter="url(#shadow)"/>
+    <text x="668" y="639" text-anchor="middle" font-size="10" font-weight="500" fill="#6C3483">5 int_ models (32 var lookups)</text>
+
+    <rect x="845" y="620" width="245" height="32" rx="8" fill="#D5F5E3" stroke="#27AE60" stroke-width="2" filter="url(#shadow)"/>
+    <text x="968" y="641" text-anchor="middle" font-size="11" font-weight="600" fill="#1E8449">dim_mtrl_master (INCR)</text>
+
+    <line x1="225" y1="634" x2="277" y2="634" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="495" y1="634" x2="552" y2="634" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="780" y1="634" x2="842" y2="634" stroke="#27AE60" stroke-width="2" marker-end="url(#arrB)"/>
+
+    <!-- ============== PIPELINE 5-8: Single-stage pipelines ============== -->
+    <line x1="20" y1="670" x2="1100" y2="670" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="560" y="695" text-anchor="middle" font-size="12" font-weight="700" fill="#555" text-decoration="underline">Single-Stage Pipelines (Staging Only)</text>
+
+    <rect x="30" y="720" width="195" height="28" rx="6" fill="#FDEBD0" stroke="#E67E22" stroke-width="1" filter="url(#shadow)"/>
+    <text x="128" y="739" text-anchor="middle" font-size="10" font-weight="500" fill="#8B4513">oracle_raw.t_cm_z1_sales</text>
+    <rect x="280" y="720" width="215" height="28" rx="6" fill="#D6EAF8" stroke="#3498DB" stroke-width="1" filter="url(#shadow)"/>
+    <text x="388" y="739" text-anchor="middle" font-size="10" font-weight="500" fill="#1A5276">stg_cm_z1_daily_sales_feed</text>
+    <line x1="225" y1="734" x2="277" y2="734" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <rect x="30" y="755" width="195" height="28" rx="6" fill="#FDEBD0" stroke="#E67E22" stroke-width="1" filter="url(#shadow)"/>
+    <text x="128" y="774" text-anchor="middle" font-size="10" font-weight="500" fill="#8B4513">oracle_raw.t_ap_citibank_vca</text>
+    <rect x="280" y="755" width="215" height="28" rx="6" fill="#D6EAF8" stroke="#3498DB" stroke-width="1" filter="url(#shadow)"/>
+    <text x="388" y="774" text-anchor="middle" font-size="10" font-weight="500" fill="#1A5276">stg_citibank_vca</text>
+    <line x1="225" y1="769" x2="277" y2="769" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <rect x="30" y="790" width="195" height="28" rx="6" fill="#FCE4D6" stroke="#D35400" stroke-width="1" filter="url(#shadow)"/>
+    <text x="128" y="809" text-anchor="middle" font-size="10" font-weight="500" fill="#8B4513">Flat files (GL accounts)</text>
+    <rect x="280" y="790" width="215" height="28" rx="6" fill="#D6EAF8" stroke="#3498DB" stroke-width="1" filter="url(#shadow)"/>
+    <text x="388" y="809" text-anchor="middle" font-size="10" font-weight="500" fill="#1A5276">stg_ff_at_z1 + stg_ff_at_zj</text>
+    <line x1="225" y1="804" x2="277" y2="804" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <rect x="30" y="825" width="195" height="28" rx="6" fill="#FDEBD0" stroke="#E67E22" stroke-width="1" filter="url(#shadow)"/>
+    <text x="128" y="844" text-anchor="middle" font-size="10" font-weight="500" fill="#8B4513">oracle_raw (DI Customer)</text>
+    <rect x="280" y="825" width="215" height="28" rx="6" fill="#D6EAF8" stroke="#3498DB" stroke-width="1" filter="url(#shadow)"/>
+    <text x="388" y="844" text-anchor="middle" font-size="10" font-weight="500" fill="#1A5276">stg_am_di_customer</text>
+    <line x1="225" y1="839" x2="277" y2="839" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <!-- Summary box -->
+    <rect x="840" y="720" width="255" height="135" rx="10" fill="#F0F9FF" stroke="#29B5E8" stroke-width="1.5"/>
+    <text x="968" y="745" text-anchor="middle" font-size="12" font-weight="700" fill="#0D8ABC">Deployment Summary</text>
+    <text x="855" y="770" font-size="11" fill="#333">Views:       44 (stg_ + int_)</text>
+    <text x="855" y="790" font-size="11" fill="#333">Tables:       3 (fct_ tables)</text>
+    <text x="855" y="810" font-size="11" fill="#333">Incremental:  4 (fct_ + dim_)</text>
+    <text x="855" y="830" font-size="11" fill="#333">Tests:      170 (schema tests)</text>
+    <text x="855" y="848" font-size="11" fill="#333">Sources:     38 (Oracle + FF)</text>
+  </svg>
+</div>
+</body>
+</html>

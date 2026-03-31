@@ -1,0 +1,75 @@
+{
+  "title": "Informatica-to-dbt Migration Assessment",
+  "generated_at": "2026-03-31 16:08:13",
+  "summary": {
+    "total_mappings": 1,
+    "success_count": 1,
+    "partial_count": 0,
+    "failed_count": 0,
+    "success_rate": 1.0,
+    "total_llm_calls": 3,
+    "total_llm_seconds": 285.534,
+    "total_files_generated": 24,
+    "total_errors": 0,
+    "total_warnings": 16,
+    "total_heal_attempts": 0,
+    "avg_quality_score": 100.0,
+    "avg_complexity": 87.0,
+    "estimated_total_tokens": 0,
+    "total_seconds": 285.838,
+    "mappings": [
+      {
+        "mapping_name": "m_INCR_DM_DIM_EQUIPMENT",
+        "workflow_name": "SQL_11_ATM_INM_to_SQL_DM_Load",
+        "complexity_score": 87,
+        "strategy": "COMPLEX",
+        "transformation_count": 33,
+        "source_count": 0,
+        "target_count": 0,
+        "chunks_total": 3,
+        "estimated_input_tokens": 0,
+        "llm_calls": 3,
+        "llm_total_seconds": 285.534,
+        "heal_attempts": 0,
+        "heal_calls": 0,
+        "files_generated": 24,
+        "sql_files": 19,
+        "yaml_files": 5,
+        "layers_covered": 4,
+        "sql_errors": 0,
+        "sql_warnings": 0,
+        "yaml_errors": 0,
+        "yaml_warnings": 0,
+        "project_errors": 0,
+        "project_warnings": 16,
+        "quality_score": 100,
+        "total_seconds": 285.838,
+        "analysis_seconds": 0.007,
+        "chunking_seconds": 0.139,
+        "generation_seconds": 285.536,
+        "postprocess_seconds": 0.01,
+        "validation_seconds": 0.065,
+        "total_errors": 0,
+        "total_warnings": 16,
+        "status": "success",
+        "error_message": null
+      }
+    ]
+  },
+  "items": [
+    {
+      "level": "info",
+      "mapping_name": "m_INCR_DM_DIM_EQUIPMENT",
+      "code": "I001",
+      "message": "Successfully converted: m_INCR_DM_DIM_EQUIPMENT",
+      "detail": "Generated 24 files, quality score 100/100"
+    },
+    {
+      "level": "info",
+      "mapping_name": "m_INCR_DM_DIM_EQUIPMENT",
+      "code": "I020",
+      "message": "High complexity mapping: m_INCR_DM_DIM_EQUIPMENT",
+      "detail": "Complexity score 87/100, strategy: COMPLEX"
+    }
+  ]
+}

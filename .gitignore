@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# dbt
+target/
+dbt_packages/
+dbt_internal_packages/
+logs/
+package-lock.yml
+
+# Converter output (regenerated)
+output/
+
+# Cache (local only)
+.infa2dbt/cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.venv/
+venv/
+
+# Secrets - never commit
+**/profiles.yml
+!dbt_project/profiles.yml
