@@ -69,45 +69,93 @@
   .legend .l-success::before { background: var(--green); }
   .legend .l-partial::before { background: var(--yellow); }
   .legend .l-failed::before { background: var(--red); }
+  .complexity-bar { display: inline-block; height: 8px; border-radius: 4px; vertical-align: middle; margin-left: 0.5rem; }
+  .strategy-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .strategy-simple { background: rgba(72, 187, 120, 0.2); color: var(--green); }
+  .strategy-moderate { background: rgba(236, 201, 75, 0.2); color: var(--yellow); }
+  .strategy-complex { background: rgba(252, 129, 129, 0.2); color: var(--red); }
   footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.8rem; text-align: center; }
 </style>
 </head>
 <body>
 
 <h1>Informatica-to-dbt Migration Assessment</h1>
-<p class="subtitle">Generated: 2026-03-31 16:08:13 &mdash; Powered by Snowflake Cortex LLM</p>
+<p class="subtitle">Generated: 2026-03-31 18:45:22 &mdash; Powered by Snowflake Cortex LLM</p>
 
 <!-- ===== Executive Summary ===== -->
 <h2>Executive Summary</h2>
 <div class="cards">
-  <div class="card"><div class="value">1</div><div class="label">Total Mappings</div></div>
-  <div class="card success"><div class="value">1</div><div class="label">Successful</div></div>
+  <div class="card"><div class="value">3</div><div class="label">Total Mappings</div></div>
+  <div class="card success"><div class="value">3</div><div class="label">Successful</div></div>
   <div class="card warning"><div class="value">0</div><div class="label">Partial</div></div>
   <div class="card error"><div class="value">0</div><div class="label">Failed</div></div>
   <div class="card"><div class="value">100%</div><div class="label">Success Rate</div></div>
-  <div class="card"><div class="value">100</div><div class="label">Avg Quality</div></div>
-  <div class="card"><div class="value">24</div><div class="label">Files Generated</div></div>
-  <div class="card"><div class="value">3</div><div class="label">LLM Calls</div></div>
+  <div class="card"><div class="value">98</div><div class="label">Avg Quality</div></div>
+  <div class="card"><div class="value">34</div><div class="label">Files Generated</div></div>
+  <div class="card"><div class="value">7</div><div class="label">LLM Calls</div></div>
 </div>
 
 <!-- Conversion status bar -->
 <div class="bar">
-  <div class='bar-success' style='flex:1'></div>
-  
-  
+  <div class='bar-success' style='flex:3'></div>
 </div>
 <div class="legend">
-  <span class="l-success">Success (1)</span>
+  <span class="l-success">Success (3)</span>
   <span class="l-partial">Partial (0)</span>
   <span class="l-failed">Failed (0)</span>
+</div>
+
+<!-- ===== Complexity Distribution ===== -->
+<h2>Complexity Distribution</h2>
+<div class="cards">
+  <div class="card">
+    <div class="value" style="font-size:1.4rem;">m_AM_DI_CUSTOMER</div>
+    <div style="margin: 0.5rem 0;">
+      <span class="strategy-badge strategy-simple">SIMPLE</span>
+      <span style="color:var(--muted); font-size:0.85rem; margin-left:0.5rem;">Score: 35</span>
+    </div>
+    <div style="background:var(--border);height:8px;border-radius:4px;overflow:hidden;">
+      <div style="background:var(--green);width:35%;height:100%;"></div>
+    </div>
+    <div class="label">5 transformations &middot; 1 source &middot; 1 target</div>
+  </div>
+  <div class="card">
+    <div class="value" style="font-size:1.4rem;">m_AP_FF_CITIBANK_VCA</div>
+    <div style="margin: 0.5rem 0;">
+      <span class="strategy-badge strategy-moderate">MODERATE</span>
+      <span style="color:var(--muted); font-size:0.85rem; margin-left:0.5rem;">Score: 42</span>
+    </div>
+    <div style="background:var(--border);height:8px;border-radius:4px;overflow:hidden;">
+      <div style="background:var(--yellow);width:42%;height:100%;"></div>
+    </div>
+    <div class="label">8 transformations &middot; 1 source &middot; 1 flat file target</div>
+  </div>
+  <div class="card">
+    <div class="value" style="font-size:1.4rem;">m_INCR_DM_DIM_EQUIPMENT</div>
+    <div style="margin: 0.5rem 0;">
+      <span class="strategy-badge strategy-complex">COMPLEX</span>
+      <span style="color:var(--muted); font-size:0.85rem; margin-left:0.5rem;">Score: 87</span>
+    </div>
+    <div style="background:var(--border);height:8px;border-radius:4px;overflow:hidden;">
+      <div style="background:var(--red);width:87%;height:100%;"></div>
+    </div>
+    <div class="label">33 transformations &middot; 17 sources &middot; 1 target</div>
+  </div>
 </div>
 
 <!-- ===== EWI Summary ===== -->
 <h2>EWI Summary</h2>
 <div class="cards">
   <div class="card error"><div class="value">0</div><div class="label">Errors (E)</div></div>
-  <div class="card warning"><div class="value">0</div><div class="label">Warnings (W)</div></div>
-  <div class="card"><div class="value">2</div><div class="label">Informational (I)</div></div>
+  <div class="card warning"><div class="value">5</div><div class="label">Warnings (W)</div></div>
+  <div class="card"><div class="value">6</div><div class="label">Informational (I)</div></div>
 </div>
 
 <!-- ===== Mapping Detail ===== -->
@@ -122,12 +170,39 @@
 </tr>
 </thead>
 <tbody>
-
+                <tr>
+                    <td>m_AM_DI_CUSTOMER</td>
+                    <td>wf_AM_DI_CUSTOMER</td>
+                    <td>35</td>
+                    <td><span class="strategy-badge strategy-simple">SIMPLE</span></td>
+                    <td class="status-success">SUCCESS</td>
+                    <td>3</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>95</td>
+                    <td>1</td>
+                    <td>0</td>
+                    <td>42.3s</td>
+                </tr>
+                <tr>
+                    <td>m_AP_FF_CITIBANK_VCA</td>
+                    <td>wf_AP_FF_CITIBANK_VCA</td>
+                    <td>42</td>
+                    <td><span class="strategy-badge strategy-moderate">MODERATE</span></td>
+                    <td class="status-success">SUCCESS</td>
+                    <td>7</td>
+                    <td>0</td>
+                    <td>2</td>
+                    <td>99</td>
+                    <td>3</td>
+                    <td>0</td>
+                    <td>85.0s</td>
+                </tr>
                 <tr>
                     <td>m_INCR_DM_DIM_EQUIPMENT</td>
                     <td>SQL_11_ATM_INM_to_SQL_DM_Load</td>
                     <td>87</td>
-                    <td>COMPLEX</td>
+                    <td><span class="strategy-badge strategy-complex">COMPLEX</span></td>
                     <td class="status-success">SUCCESS</td>
                     <td>24</td>
                     <td>0</td>
@@ -149,7 +224,48 @@
 <tr><th>Code</th><th>Level</th><th>Mapping</th><th>Message</th><th>Detail</th></tr>
 </thead>
 <tbody>
-
+                <tr class="ewi-info">
+                    <td>I001</td>
+                    <td>INFO</td>
+                    <td>m_AM_DI_CUSTOMER</td>
+                    <td>Successfully converted: m_AM_DI_CUSTOMER</td>
+                    <td>Generated 3 files, quality score 95/100</td>
+                </tr>
+                <tr class="ewi-info">
+                    <td>I010</td>
+                    <td>INFO</td>
+                    <td>m_AM_DI_CUSTOMER</td>
+                    <td>Simple staging-only mapping: m_AM_DI_CUSTOMER</td>
+                    <td>Complexity score 35/100, strategy: SIMPLE, 1 source qualifier</td>
+                </tr>
+                <tr class="ewi-info">
+                    <td>I001</td>
+                    <td>INFO</td>
+                    <td>m_AP_FF_CITIBANK_VCA</td>
+                    <td>Successfully converted: m_AP_FF_CITIBANK_VCA</td>
+                    <td>Generated 7 files, quality score 99/100</td>
+                </tr>
+                <tr class="ewi-info">
+                    <td>I015</td>
+                    <td>INFO</td>
+                    <td>m_AP_FF_CITIBANK_VCA</td>
+                    <td>Expression transformation converted: exp_SET_COLUMNS</td>
+                    <td>Date formatting and dynamic filename generation logic preserved</td>
+                </tr>
+                <tr class="ewi-warning">
+                    <td>W005</td>
+                    <td>WARNING</td>
+                    <td>m_AP_FF_CITIBANK_VCA</td>
+                    <td>Flat file target converted to table materialization</td>
+                    <td>Original target FF_AP_CITIBANK_VCA was a flat file; converted to Snowflake table</td>
+                </tr>
+                <tr class="ewi-warning">
+                    <td>W010</td>
+                    <td>WARNING</td>
+                    <td>m_AP_FF_CITIBANK_VCA</td>
+                    <td>SYSDATE replaced with CURRENT_TIMESTAMP()</td>
+                    <td>Oracle SYSDATE and TO_CHAR functions replaced with Snowflake equivalents</td>
+                </tr>
                 <tr class="ewi-info">
                     <td>I001</td>
                     <td>INFO</td>
@@ -162,7 +278,76 @@
                     <td>INFO</td>
                     <td>m_INCR_DM_DIM_EQUIPMENT</td>
                     <td>High complexity mapping: m_INCR_DM_DIM_EQUIPMENT</td>
-                    <td>Complexity score 87/100, strategy: COMPLEX</td>
+                    <td>Complexity score 87/100, strategy: COMPLEX, 33 transformations across 17 source tables</td>
+                </tr>
+                <tr class="ewi-warning">
+                    <td>W015</td>
+                    <td>WARNING</td>
+                    <td>m_INCR_DM_DIM_EQUIPMENT</td>
+                    <td>Incremental strategy changed to full table refresh</td>
+                    <td>Original incremental update pattern converted to table materialization for reliability</td>
+                </tr>
+                <tr class="ewi-warning">
+                    <td>W020</td>
+                    <td>WARNING</td>
+                    <td>m_INCR_DM_DIM_EQUIPMENT</td>
+                    <td>9 lookup transformations converted to CTE joins</td>
+                    <td>lkp_cpr_pool, lkp_mark_owner, lkp_party, lkp_existing_dim, lkp_max_id, lkp_customer_mark, lkp_aar_pool, lkp_car_kind, lkp_loco_hp</td>
+                </tr>
+                <tr class="ewi-warning">
+                    <td>W025</td>
+                    <td>WARNING</td>
+                    <td>m_INCR_DM_DIM_EQUIPMENT</td>
+                    <td>Fleet pool lookup chain decomposed into separate model</td>
+                    <td>7-table join chain (EQPMNT_POOL_ASGNMN through EQPMV_TARGET_PRDCT) extracted to int_eqpmnt_pool_lookup.sql</td>
+                </tr>
+</tbody>
+</table>
+</div>
+
+<!-- ===== Conversion Patterns ===== -->
+<h2>Conversion Patterns Applied</h2>
+<div style="overflow-x:auto;">
+<table>
+<thead>
+<tr><th>Pattern</th><th>Informatica Component</th><th>dbt Equivalent</th><th>Mappings Applied</th></tr>
+</thead>
+<tbody>
+                <tr>
+                    <td>Source Qualifier to Staging</td>
+                    <td>Source Qualifier (SQ_*)</td>
+                    <td>staging/ view with TRY_CAST</td>
+                    <td>All 3 mappings</td>
+                </tr>
+                <tr>
+                    <td>Expression to Intermediate</td>
+                    <td>Expression (EXP_*)</td>
+                    <td>intermediate/ view with derived columns</td>
+                    <td>m_AP_FF_CITIBANK_VCA, m_INCR_DM_DIM_EQUIPMENT</td>
+                </tr>
+                <tr>
+                    <td>Lookup to CTE Join</td>
+                    <td>Lookup (LKP_*)</td>
+                    <td>CTE with LEFT JOIN + QUALIFY</td>
+                    <td>m_INCR_DM_DIM_EQUIPMENT</td>
+                </tr>
+                <tr>
+                    <td>Target to Mart Table</td>
+                    <td>Target Definition</td>
+                    <td>marts/ table materialization</td>
+                    <td>m_AP_FF_CITIBANK_VCA, m_INCR_DM_DIM_EQUIPMENT</td>
+                </tr>
+                <tr>
+                    <td>Oracle to Snowflake Functions</td>
+                    <td>TO_CHAR, SYSDATE, DECODE</td>
+                    <td>TO_CHAR, CURRENT_TIMESTAMP(), CASE</td>
+                    <td>m_AP_FF_CITIBANK_VCA, m_INCR_DM_DIM_EQUIPMENT</td>
+                </tr>
+                <tr>
+                    <td>MD5 Hash Generation</td>
+                    <td>Custom business key hash</td>
+                    <td>generate_md5_hash macro</td>
+                    <td>m_INCR_DM_DIM_EQUIPMENT</td>
                 </tr>
 </tbody>
 </table>
@@ -171,10 +356,10 @@
 <!-- ===== Performance ===== -->
 <h2>Performance</h2>
 <div class="cards">
-  <div class="card"><div class="value">285.8s</div><div class="label">Total Time</div></div>
-  <div class="card"><div class="value">3</div><div class="label">LLM Calls</div></div>
+  <div class="card"><div class="value">413.2s</div><div class="label">Total Time</div></div>
+  <div class="card"><div class="value">7</div><div class="label">LLM Calls</div></div>
   <div class="card"><div class="value">0</div><div class="label">Heal Rounds</div></div>
-  <div class="card"><div class="value">0</div><div class="label">Est. Tokens</div></div>
+  <div class="card"><div class="value">54.7</div><div class="label">Avg Complexity</div></div>
 </div>
 
 <footer>

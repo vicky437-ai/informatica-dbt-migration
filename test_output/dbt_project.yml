@@ -27,6 +27,10 @@ models:
       +tags: ['m_AP_FF_CITIBANK_VCA']
       staging:
         +materialized: view
+      intermediate:
+        +materialized: view
+      marts:
+        +materialized: table
     m_INCR_DM_DIM_EQUIPMENT:
       +tags: ['m_INCR_DM_DIM_EQUIPMENT']
       staging:
