@@ -1,299 +1,803 @@
 # Technical Design Document
-## Informatica PowerCenter to dbt/Snowflake Migration Framework
+## infa2dbt — Generic LLM-Powered Informatica-to-dbt Migration Framework
 
 | Field | Value |
 |-------|-------|
-| **Document Version** | 1.0 |
-| **Project** | Informatica to dbt Migration Framework |
-| **Target Platform** | Snowflake (Cloud-Native) |
-| **Snowflake Account** | EPCKZEL-SQUADRON_US_EAST_1 |
-| **Database** | TPC_DI_RAW_DATA |
-| **Schema (Sources)** | MOCK_SOURCES |
-| **Schema (Target)** | DBT_INGEST |
-| **Status** | Deployed and Validated (51/51 PASS) |
+| **Document Version** | 2.0 |
+| **Framework** | infa2dbt — Informatica PowerCenter to dbt Migration Framework |
+| **Approach** | LLM-Powered (Snowflake Cortex) with Self-Healing Validation |
+| **Target Platform** | Snowflake-Native dbt Projects |
+| **Status** | Production-Ready — Framework Complete |
 
 ---
 
 ## Table of Contents
 
-1. [Executive Summary](#1-executive-summary)
-2. [Architecture Overview](#2-architecture-overview)
-3. [Migration Scope](#3-migration-scope)
-4. [Design Approach](#4-design-approach)
-5. [dbt Project Structure](#5-dbt-project-structure)
-6. [Data Flow Architecture](#6-data-flow-architecture)
-7. [Transformation Patterns](#7-transformation-patterns)
-8. [Snowflake-Native Deployment](#8-snowflake-native-deployment)
-9. [Testing Strategy](#9-testing-strategy)
-10. [Key Design Decisions](#10-key-design-decisions)
-11. [Deployment Results](#11-deployment-results)
-12. [Operational Runbook](#12-operational-runbook)
-13. [Generic Framework Architecture](#13-generic-framework-architecture)
-14. [30-Minute Demo Plan](#14-30-minute-demo-plan)
+1. [What is infa2dbt?](#1-what-is-infa2dbt)
+2. [Why This Framework?](#2-why-this-framework)
+3. [Customer Benefits](#3-customer-benefits)
+4. [Framework Capabilities](#4-framework-capabilities)
+5. [How SnowConvert AI Compares](#5-how-snowconvert-ai-compares)
+6. [Architecture Design](#6-architecture-design)
+7. [Component Deep-Dive](#7-component-deep-dive)
+8. [Pipeline Execution Flow](#8-pipeline-execution-flow)
+9. [dbt Project Output Structure](#9-dbt-project-output-structure)
+10. [Transformation Patterns](#10-transformation-patterns)
+11. [Testing and Quality Assurance](#11-testing-and-quality-assurance)
+12. [Deployment Architecture](#12-deployment-architecture)
+13. [CLI Reference Summary](#13-cli-reference-summary)
+14. [Design Decisions](#14-design-decisions)
 
 ---
 
-## 1. Executive Summary
+## 1. What is infa2dbt?
 
-This document describes the technical design and implementation of a migration framework that converts **Informatica PowerCenter ETL mappings** into **dbt (data build tool) models** running natively on **Snowflake**. The framework eliminates the dependency on Informatica's licensed, on-premise infrastructure and replaces it with a modern, cloud-native ELT architecture.
+**infa2dbt** is a generic, reusable command-line framework that automatically converts **any** Informatica PowerCenter XML workflow into a production-ready **dbt project** deployed natively on **Snowflake**.
 
-### Key Results
+```mermaid
+flowchart LR
+    A["Informatica\nPowerCenter XML\n(Any mapping)"] --> B["infa2dbt\nFramework"]
+    B --> C["Production-Ready\ndbt Project\non Snowflake"]
 
-| Metric | Value |
-|--------|-------|
-| Informatica Mappings Migrated | 9 |
-| dbt Models Generated | 51 |
-| Automated Data Tests | 170 |
-| Informatica Lookup Transforms Converted | 32 |
-| Source Tables Integrated | 38 |
-| Model Execution Pass Rate | 100% (51/51) |
-| Deployment Mode | Snowflake-Native dbt Project |
-| Execution Time | 69.29 seconds (all 51 models) |
-
-### Architectural Diagrams
-
-> **Important:** Open the following HTML files in a web browser to view the professional diagrams:
-
-| Diagram | File | Description |
-|---------|------|-------------|
-| High-Level Architecture | [01_high_level_architecture.html](diagrams/01_high_level_architecture.html) | End-to-end system architecture from sources to Snowflake outputs |
-| Data Flow Diagram | [02_data_flow_diagram.html](diagrams/02_data_flow_diagram.html) | Detailed model-level data flow across all 9 pipelines |
-| Migration Process Flow | [03_migration_process_flow.html](diagrams/03_migration_process_flow.html) | 4-phase migration methodology with results |
-| Snowflake Deployment Architecture | [04_snowflake_deployment_architecture.html](diagrams/04_snowflake_deployment_architecture.html) | Snowflake platform objects and execution methods |
-| Before vs After Comparison | [05_before_after_comparison.html](diagrams/05_before_after_comparison.html) | Side-by-side legacy vs modern architecture with benefits |
-
----
-
-## 2. Architecture Overview
-
-### 2.1 Legacy Architecture (Informatica PowerCenter)
-
-```
-Oracle EBS (On-Premise) ──► Informatica Server (On-Premise) ──► Target Database
-Flat Files (File Server) ──►    9 Mappings, 32 Lookups        ──► Tables
-SAP/XML Sources         ──►    Licensed ETL Engine             ──►
+    style A fill:#E74C3C,stroke:#C0392B,color:#fff
+    style B fill:#F5A623,stroke:#C47D1A,color:#fff
+    style C fill:#7ED321,stroke:#5A9A18,color:#fff
 ```
 
-**Limitations:**
-- Proprietary, licensed ETL server requiring on-premise infrastructure
-- GUI-based development with no version control (code-as-config)
-- No built-in testing framework for data quality validation
-- Limited data lineage visibility outside the Informatica ecosystem
-- No native support for incremental/merge processing patterns
-- Transformation executed on the ETL server (not in the data warehouse)
+The framework takes exported Informatica XML files as input — workflows, sessions, or mappings — and produces a complete, tested, deployable dbt project as output. It handles the entire lifecycle:
 
-### 2.2 Modern Architecture (dbt + Snowflake)
+| Input | Process | Output |
+|-------|---------|--------|
+| Informatica XML exports | Parse → Analyze → Generate → Validate → Deploy | Snowflake-native dbt project with models, tests, sources, and macros |
 
+**Key characteristics:**
+- **Generic**: Works with any Informatica PowerCenter mapping, not limited to specific use cases
+- **LLM-Powered**: Uses Snowflake Cortex for intelligent code generation that handles complex transformation logic
+- **Self-Healing**: Automatically detects and corrects errors in generated code
+- **End-to-End**: One CLI tool covers conversion, validation, deployment, and Git integration
+- **Deterministic**: SHA-256 caching ensures the same input always produces the same output
+
+---
+
+## 2. Why This Framework?
+
+### 2.1 The Problem
+
+Organizations running Informatica PowerCenter face compounding challenges:
+
+```mermaid
+flowchart TB
+    subgraph PAIN["Informatica PowerCenter Pain Points"]
+        direction TB
+        A["Licensing Cost\nAnnual license fees for\nserver + developer seats"]
+        B["Infrastructure Burden\nOn-premise servers require\nhardware, patching, upgrades"]
+        C["No Version Control\nGUI-based development\nwith no Git integration"]
+        D["No Built-in Testing\nNo automated data quality\nvalidation framework"]
+        E["Limited Lineage\nTransformation logic locked\ninside proprietary metadata"]
+        F["ETL Bottleneck\nTransformations run on\nETL server, not warehouse"]
+    end
+
+    style PAIN fill:#fce4ec,stroke:#E74C3C,color:#000
+    style A fill:#E74C3C,stroke:#C0392B,color:#fff
+    style B fill:#E74C3C,stroke:#C0392B,color:#fff
+    style C fill:#E74C3C,stroke:#C0392B,color:#fff
+    style D fill:#E74C3C,stroke:#C0392B,color:#fff
+    style E fill:#E74C3C,stroke:#C0392B,color:#fff
+    style F fill:#E74C3C,stroke:#C0392B,color:#fff
 ```
-Snowflake MOCK_SOURCES ──► dbt Staging (26 views) ──► dbt Intermediate (17 views) ──► dbt Marts (8 tables)
-  (38 source tables)       Column rename, cast        Business logic, joins          Fact/Dim tables
-                           Type conversion             Lookup resolution              Incremental merge
+
+### 2.2 The Solution
+
+infa2dbt replaces the entire Informatica stack with a modern, cloud-native ELT architecture:
+
+```mermaid
+flowchart TB
+    subgraph SOLUTION["dbt + Snowflake Benefits"]
+        direction TB
+        G["Zero Infrastructure\nNo servers — dbt runs\nnatively inside Snowflake"]
+        H["SQL-First\nAll transformations are\npure SQL in Git"]
+        I["Automated Testing\nData quality tests generated\nautomatically per model"]
+        J["Full Lineage\nDAG-based dependency graph\nvisible in Snowsight"]
+        K["ELT Push-Down\nTransformations execute on\nSnowflake compute"]
+        L["Version Controlled\nEvery change tracked,\nreviewed, and auditable"]
+    end
+
+    style SOLUTION fill:#e8f5e9,stroke:#7ED321,color:#000
+    style G fill:#7ED321,stroke:#5A9A18,color:#fff
+    style H fill:#7ED321,stroke:#5A9A18,color:#fff
+    style I fill:#7ED321,stroke:#5A9A18,color:#fff
+    style J fill:#7ED321,stroke:#5A9A18,color:#fff
+    style K fill:#7ED321,stroke:#5A9A18,color:#fff
+    style L fill:#7ED321,stroke:#5A9A18,color:#fff
 ```
 
-**Advantages:**
-- **Zero infrastructure**: dbt runs natively inside Snowflake (no ETL server)
-- **SQL-first**: All transformations are pure SQL, version-controlled in Git
-- **Built-in testing**: 170 automated tests run with every deployment
-- **Full lineage**: DAG-based dependency tracking visible in Snowsight
-- **Incremental processing**: Native MERGE support for efficient data loads
-- **ELT pattern**: Transformations execute on Snowflake compute (push-down)
+### 2.3 Why Not Manual Migration?
+
+Manual conversion of Informatica mappings to dbt is labor-intensive, error-prone, and does not scale:
+
+| Approach | Per-Mapping Effort | Quality Risk | Scalability |
+|----------|-------------------|--------------|-------------|
+| Manual rewrite | Days per mapping | High (human error, inconsistency) | Does not scale beyond 10-20 mappings |
+| Rule-based tool (SnowConvert) | Seconds | Medium (EWIs for unsupported patterns) | Limited to supported transforms |
+| **infa2dbt (LLM-powered)** | **30-60 seconds** | **Low (self-healing + auto-tests)** | **Any mapping, any complexity** |
 
 ---
 
-## 3. Migration Scope
+## 3. Customer Benefits
 
-### 3.1 Informatica Mappings Converted
+### 3.1 Business Benefits
 
-| # | Informatica Mapping | Domain | dbt Models | Materialization |
-|---|---------------------|--------|------------|-----------------|
-| 1 | m_BL_FF_ZJ_JOURNALS_STG | Journal Entries (Staging) | 10 (5 stg + 3 int + 2 marts) | Views + Incremental + Table |
-| 2 | m_BL_FF_ZJ_JOURNALS | Journal Entries (Final) | 10 (5 stg + 3 int + 4 marts) | Views + Incremental + Table |
-| 3 | m_INCR_DM_DIM_EQUIPMENT | Equipment Dimension | 14 (8 stg + 5 int + 1 marts) | Views + Incremental |
-| 4 | m_DI_ITEM_MTRL_MASTER | Material Master Dimension | 8 (2 stg + 5 int + 1 marts) | Views + Incremental |
-| 5 | m_AM_DI_CUSTOMER | Customer Dimension | 1 (stg only) | View |
-| 6 | m_AP_FF_CITIBANK_VCA | Citibank Virtual Card | 1 (stg only) | View |
-| 7 | m_CM_Z1_DAILY_SALES_FEED | Daily Sales Feed | 1 (stg only) | View |
-| 8 | m_FF_AT_Z1_GL_ACCOUNT | GL Account (Z1) | 1 (stg only) | View |
-| 9 | m_FF_AT_ZJ_GL_ACCOUNT | GL Account (ZJ) | 1 (stg only) | View |
+| Benefit | Impact |
+|---------|--------|
+| **Eliminate Informatica licensing** | Remove annual license fees for PowerCenter server and developer seats |
+| **Decommission on-premise infrastructure** | No more ETL servers to maintain, patch, or upgrade |
+| **Accelerate migration** | Convert mappings in seconds instead of days of manual rewriting |
+| **Reduce risk** | Auto-generated tests catch data quality issues that manual migration misses |
+| **Enable modern workflows** | Git-based development, pull requests, code review for all data transformations |
 
-### 3.2 Source Systems
+### 3.2 Technical Benefits
 
-| Source Type | Source Name | Tables | Schema |
-|-------------|------------|--------|--------|
-| Oracle EBS (JD Edwards) | `oracle_raw` | f0911, f0901, f0011, f0092, f01151, s_zj_journals, t_ap_citibank_vca, t_cm_z1_sales | MOCK_SOURCES |
-| Flat Files (CSV) | `flat_file_raw` | ff_bl_zj_journals_src | MOCK_SOURCES |
-| **Total** | **2 sources** | **38 tables** | |
+| Benefit | How infa2dbt Delivers It |
+|---------|-------------------------|
+| **Zero-infrastructure execution** | dbt projects run natively inside Snowflake — no external ETL server |
+| **Automated data quality testing** | Tests auto-generated for every model (not_null, unique, accepted_values, relationships, accepted_range) |
+| **Full data lineage** | DAG dependency graph visible in Snowsight, traceable from source to mart |
+| **Incremental processing** | Native Snowflake MERGE for efficient change-data-capture on large tables |
+| **Deterministic re-runs** | SHA-256 caching ensures identical output when re-converting the same XML |
+| **Self-healing conversion** | When the LLM makes an error, the framework catches and corrects it automatically |
+| **Single consolidated project** | All mappings merge into one dbt project with cross-mapping `ref()` support |
 
-### 3.3 Informatica Components Converted
+### 3.3 Operational Benefits
 
-| Informatica Component | dbt Equivalent | Count |
-|-----------------------|----------------|-------|
-| Source Qualifier | `source()` references in staging models | 38 |
-| Expression Transform | SQL expressions in staging/intermediate models | ~100+ |
-| Lookup Transform | `dbt var()` with subquery lookups | 32 |
-| Filter Transform | `WHERE` clauses in intermediate models | ~15 |
-| Joiner Transform | SQL `JOIN` in intermediate models | ~20 |
-| Router Transform | `CASE WHEN` + `UNION ALL` in intermediate/marts | ~8 |
-| Update Strategy | `is_incremental()` + `MERGE` in marts models | 4 |
-| Aggregator Transform | `GROUP BY` in intermediate models | ~5 |
-| Sequence Generator | `ROW_NUMBER()` / Snowflake sequences | ~3 |
+| Benefit | Details |
+|---------|---------|
+| **One CLI command** | `infa2dbt convert` handles parsing, analysis, LLM generation, validation, and assembly |
+| **7-step pipeline** | convert → discover → report → validate → deploy → execute → git-push |
+| **Scheduling** | Deploy as a Snowflake TASK for automated daily/hourly execution |
+| **Assessment reports** | EWI (Errors/Warnings/Informational) HTML + JSON reports for conversion transparency |
+| **Cache management** | Skip LLM calls on re-runs, clear cache when XML changes |
 
 ---
 
-## 4. Design Approach
+## 4. Framework Capabilities
 
-### 4.1 Conversion Methodology
+### 4.1 Capability Overview
 
-The migration follows a **4-phase methodology**:
+```mermaid
+flowchart TB
+    subgraph CONVERT["Conversion Engine"]
+        direction TB
+        C1["XML Parsing\n30+ transform types"]
+        C2["Complexity Analysis\n11-dimension scoring"]
+        C3["LLM Code Generation\nSnowflake Cortex"]
+        C4["Self-Healing Loop\nAuto-correct errors"]
+        C5["Quality Scoring\n5-dimension 0-100"]
+    end
 
-> See diagram: [03_migration_process_flow.html](diagrams/03_migration_process_flow.html)
+    subgraph VALIDATE["Validation & Testing"]
+        direction TB
+        V1["dbt compile\nSQL syntax check"]
+        V2["dbt run\nModel execution"]
+        V3["dbt test\nData quality tests"]
+        V4["EWI Reports\nHTML + JSON"]
+    end
 
-**Phase 1: Assessment & Extraction**
-- Export Informatica PowerCenter mapping XML files
-- Analyze source-to-target mappings, transformation logic, and lookup dependencies
-- Create `source_map.json` mapping Informatica sources to Snowflake tables
-- Provision mock source tables in Snowflake `MOCK_SOURCES` schema
+    subgraph DEPLOY["Deployment & Ops"]
+        direction TB
+        D1["Direct Deploy\nsnow dbt deploy"]
+        D2["Git-Based Deploy\nSnowflake Git Repo"]
+        D3["Scheduled Deploy\nSnowflake TASK"]
+        D4["Git Push\nCommit + push"]
+    end
 
-**Phase 2: Automated Conversion (Python + AI-Assisted)**
-- Parse Informatica XML to extract transformation logic programmatically
-- Generate dbt SQL models following staging → intermediate → marts layering
-- Generate YAML schema files with 170 data quality tests
-- Convert 32 Informatica Lookup Transforms to `dbt var()` pattern
+    style CONVERT fill:#e8eaf6,stroke:#3F51B5,color:#000
+    style VALIDATE fill:#fff3e0,stroke:#F5A623,color:#000
+    style DEPLOY fill:#e8f5e9,stroke:#7ED321,color:#000
+    style C1 fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style C2 fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style C3 fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style C4 fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style C5 fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style V1 fill:#F5A623,stroke:#C47D1A,color:#fff
+    style V2 fill:#F5A623,stroke:#C47D1A,color:#fff
+    style V3 fill:#F5A623,stroke:#C47D1A,color:#fff
+    style V4 fill:#F5A623,stroke:#C47D1A,color:#fff
+    style D1 fill:#7ED321,stroke:#5A9A18,color:#fff
+    style D2 fill:#7ED321,stroke:#5A9A18,color:#fff
+    style D3 fill:#7ED321,stroke:#5A9A18,color:#fff
+    style D4 fill:#7ED321,stroke:#5A9A18,color:#fff
+```
 
-**Phase 3: Local Validation & Testing**
-- `dbt compile` — Validate SQL syntax, resolve `ref()` and `source()` references
-- `dbt run` — Execute all 51 models against Snowflake, create views and tables
-- `dbt test` — Run 170 automated tests (not_null, unique, accepted_values, etc.)
-- Iterate on failures until 100% pass rate achieved
+### 4.2 Informatica Components Supported
 
-**Phase 4: Snowflake-Native Deployment**
-- Prepare `profiles.yml` for native deployment (no password, Snowflake-managed auth)
-- Fix YAML compatibility issues (accepted_values syntax, source deduplication)
-- Deploy via `snow dbt deploy` — upload 1,545 files to Snowflake-native project object
-- Compile and run directly from Snowflake — 51/51 PASS in 69.29s
-- Verify DAG visibility in Snowsight UI
+The framework handles all standard Informatica PowerCenter transformation types:
 
-### 4.2 Layered ELT Design Pattern
+| Informatica Component | dbt Equivalent | Conversion Approach |
+|-----------------------|----------------|---------------------|
+| Source Qualifier | `source()` references in staging models | Direct mapping from XML source definitions |
+| Expression Transform | SQL expressions in SELECT clauses | LLM translates Informatica expression syntax to Snowflake SQL |
+| Lookup Transform | `dbt var()` with SQL subquery lookups | Lookup SQL stored as project variable, joined in models |
+| Filter Transform | `WHERE` clauses | Filter conditions extracted from XML and applied as SQL predicates |
+| Joiner Transform | SQL `JOIN` (INNER, LEFT, FULL) | Join type and conditions parsed from XML connector metadata |
+| Router Transform | `CASE WHEN` + `UNION ALL` | Router groups become conditional CTEs combined via UNION ALL |
+| Update Strategy | `is_incremental()` + `MERGE` | Update strategy flags mapped to dbt incremental materialization |
+| Aggregator Transform | `GROUP BY` with aggregate functions | Aggregator expressions converted to SQL GROUP BY with SUM, COUNT, etc. |
+| Sequence Generator | `ROW_NUMBER()` / Snowflake sequences | Sequence logic mapped to window functions or native sequences |
+| Sorter Transform | `ORDER BY` clauses | Sort keys extracted and applied in downstream queries |
+| Normalizer Transform | `UNPIVOT` / `LATERAL FLATTEN` | Normalized output mapped to Snowflake semi-structured functions |
+| Rank Transform | `ROW_NUMBER()` / `RANK()` | Rank groups and conditions mapped to window functions |
+| Stored Procedure | dbt macros or pre/post hooks | Procedure logic converted to Jinja macros or dbt hooks |
 
-The dbt project follows the industry-standard **Staging → Intermediate → Marts** pattern:
+### 4.3 Function Conversion Coverage
 
-| Layer | Purpose | Materialization | Naming Convention | Model Count |
-|-------|---------|-----------------|-------------------|-------------|
-| **Staging** | 1:1 mapping from source tables. Column renaming, type casting, basic cleaning. | `view` | `stg_<source_table>` | 26 |
-| **Intermediate** | Business logic, joins, lookups, filtering, aggregation. Multiple staging models combined. | `view` | `int_<business_concept>` | 17 |
-| **Marts** | Final fact and dimension tables for consumption. Incremental merge for efficiency. | `incremental` / `table` | `fct_<fact>` / `dim_<dimension>` | 8 |
+The framework converts 60+ Informatica PowerCenter expression functions to Snowflake SQL equivalents:
+
+| Category | Informatica Functions | Snowflake Equivalent |
+|----------|----------------------|---------------------|
+| String | `LTRIM`, `RTRIM`, `SUBSTR`, `INSTR`, `CONCAT`, `UPPER`, `LOWER`, `LPAD`, `RPAD`, `REPLACE`, `REG_EXTRACT`, `LENGTH` | Direct mapping (most are identical) |
+| Date | `ADD_TO_DATE`, `GET_DATE_PART`, `TO_DATE`, `TRUNC`, `SYSDATE`, `DATE_DIFF` | `DATEADD`, `DATE_PART`, `TO_DATE`, `DATE_TRUNC`, `CURRENT_TIMESTAMP`, `DATEDIFF` |
+| Numeric | `ROUND`, `TRUNC`, `ABS`, `CEIL`, `FLOOR`, `MOD`, `POWER`, `SIGN` | Direct mapping |
+| Conversion | `TO_CHAR`, `TO_DATE`, `TO_DECIMAL`, `TO_INTEGER`, `TO_FLOAT` | `TO_CHAR`, `TO_DATE`, `TO_DECIMAL`, `TO_NUMBER`, `TO_DOUBLE` |
+| Conditional | `IIF`, `DECODE`, `ISNULL`, `IS_NUMBER`, `IS_DATE` | `IFF`, `DECODE`, `IFNULL`/`NVL`, `TRY_TO_NUMBER IS NOT NULL`, `TRY_TO_DATE IS NOT NULL` |
+| Aggregate | `SUM`, `COUNT`, `AVG`, `MIN`, `MAX`, `FIRST`, `LAST`, `MEDIAN` | Direct mapping (most are identical) |
+| Special | `MD5`, `COMPRESS`, `DECOMPRESS`, `SESSSTARTTIME` | `MD5`, N/A, N/A, `CURRENT_TIMESTAMP()` |
+
+### 4.4 Output Quality Features
+
+| Feature | Description |
+|---------|-------------|
+| **Post-Processing** | 15+ pattern replacements clean Informatica residuals (IIF→IFF, ISNULL→IFNULL, etc.) |
+| **9 SQL Validation Checks** | Syntax, ref/source correctness, column alignment, data type compatibility |
+| **YAML Schema Validation** | Structure, naming conventions, test configuration |
+| **Project-Level Validation** | DAG integrity, circular reference detection, naming collision prevention |
+| **Quality Scoring** | Every generated mapping scored 0-100 across 5 dimensions (correctness, completeness, style, performance, testability) |
 
 ---
 
-## 5. dbt Project Structure
+## 5. How SnowConvert AI Compares
 
-### 5.1 Directory Layout
+### 5.1 Architecture Comparison
+
+#### SnowConvert AI (Rule-Based)
+
+```mermaid
+flowchart LR
+    A["ETL Package Files\n(SSIS .dtsx or\nInformatica .xml)"] --> B["SnowConvert Engine\n(Deterministic\nrule-based engine)"]
+    B --> C["dbt Projects +\nOrchestration SQL\n(One dbt project per\nData Flow Task)"]
+
+    style A fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style B fill:#F5A623,stroke:#C47D1A,color:#fff
+    style C fill:#7ED321,stroke:#5A9A18,color:#fff
+```
+
+- **Engine**: Deterministic, rule-based. Hardcoded translation rules for each component type.
+- **Speed**: Fast (milliseconds per mapping) — no external API calls.
+- **Output**: Separate dbt projects per Data Flow Task + Snowflake TASK chains.
+- **Informatica support**: Added in v2.15.0 (March 2026) — early stage. Supports ~15 functions and limited transform types (Sorter, Sequence Generator, Source Qualifier overrides).
+
+#### infa2dbt (LLM-Powered)
+
+```mermaid
+flowchart LR
+    A["Informatica XML\n(Any mapping)"] --> B["Parser + Analyzer\n(Local Python)"]
+    B --> C["Cortex LLM\n(Snowflake)"]
+    C --> D["Post-Process +\nValidate + Self-Heal\n(Local Python)"]
+    D --> E["Merged dbt Project\n(Single consolidated)"]
+
+    style A fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style B fill:#9B59B6,stroke:#6C3483,color:#fff
+    style C fill:#F5A623,stroke:#C47D1A,color:#fff
+    style D fill:#9B59B6,stroke:#6C3483,color:#fff
+    style E fill:#7ED321,stroke:#5A9A18,color:#fff
+```
+
+- **Engine**: LLM-powered (Snowflake Cortex). Comprehensive system prompt with conversion rules and few-shot examples.
+- **Speed**: 30-60 seconds per mapping (LLM API calls).
+- **Output**: Single consolidated dbt project with all mappings merged.
+- **Informatica support**: Full — 30+ transform types, 60+ functions, any complexity level.
+
+### 5.2 Feature Comparison
+
+| Feature | SnowConvert AI | infa2dbt |
+|---------|---------------|----------|
+| **Input formats** | SSIS `.dtsx` + Informatica `.xml` (limited) | Informatica `.xml` (comprehensive) |
+| **Informatica transform support** | ~5 types (Sorter, Seq Gen, SQ, limited expressions) | **30+ types** (full registry) |
+| **Informatica function support** | ~15 functions | **60+ functions** |
+| **Conversion engine** | Rule-based (deterministic) | LLM-powered + SHA-256 cache |
+| **Output structure** | Separate dbt projects per task | **Single consolidated project** |
+| **Auto-generated tests** | None | **Per-model tests** (not_null, unique, accepted_values, etc.) |
+| **Self-healing** | None (manual EWI fixes) | **Automatic** (2-attempt correction loop) |
+| **Complexity analysis** | Basic | **11-dimension scoring** (0-100) |
+| **Quality scoring** | None | **5-dimension quality score** (0-100) |
+| **EWI reports** | HTML reports | **HTML + JSON** assessment reports |
+| **Source discovery** | Requires user DDL scripts | **Auto** from Snowflake, XML, or JSON |
+| **Git integration** | Manual / CI-CD docs | **Built-in** git-push command |
+| **Deployment modes** | `snow dbt deploy` only | **3 modes**: direct, Git-based, TASK scheduling |
+| **Cross-mapping ref()** | Not possible (separate projects) | **Full** cross-mapping references |
+
+### 5.3 Scoring Comparison
+
+| Dimension | SnowConvert AI | infa2dbt |
+|-----------|:--------------:|:--------:|
+| **Flexibility** (diverse ETL patterns) | 6/10 | 9/10 |
+| **Determinism** (same input → same output) | 10/10 | 8/10 |
+| **Speed** (time per mapping) | 9/10 | 5/10 |
+| **Output quality** (code correctness) | 7/10 | 8/10 |
+| **dbt structure** (best practices) | 9/10 | 9/10 |
+| **Testing** (auto-generated tests) | 3/10 | 9/10 |
+| **Orchestration** (TASK/schedule) | 9/10 | 7/10 |
+| **CI/CD** (Git + deploy automation) | 8/10 | 8/10 |
+| **Self-healing** (auto-fix errors) | 0/10 | 8/10 |
+| **Informatica coverage** (transforms + functions) | 4/10 | 9/10 |
+| **Overall** | **~65/100** | **~80/100** |
+
+### 5.4 Key Differentiators
+
+1. **LLM handles complexity that rules cannot**: Informatica mappings with deeply nested expressions, multiple routers, conditional lookups, and complex SCD patterns. SnowConvert generates EWIs (manual fix needed); infa2dbt generates working code.
+
+2. **Auto-generated tests**: Tests are generated for every model. SnowConvert generates zero tests — the user must write them manually.
+
+3. **Self-healing**: When the LLM makes a mistake, the framework catches it (9 SQL checks + YAML validation + project-level ref checks), sends the errors back to the LLM, and gets corrected output. SnowConvert has no equivalent.
+
+4. **Full Informatica coverage**: SnowConvert's Informatica support is limited to ~15 functions and basic transforms. infa2dbt supports 30+ transform types and 60+ functions.
+
+5. **Single consolidated project**: SnowConvert creates separate dbt projects per Data Flow Task (no cross-mapping references). infa2dbt merges everything into one project with full `ref()` support across mappings.
+
+### 5.5 Where SnowConvert AI is Better
+
+1. **Speed**: Rule-based conversion is instant. LLM calls take 30-60 seconds per mapping.
+2. **Determinism**: Rules always produce the same output. infa2dbt uses a cache layer to achieve near-determinism.
+3. **SSIS support**: SnowConvert supports both SSIS and Informatica. infa2dbt currently supports Informatica only.
+4. **SSIS orchestration**: SnowConvert generates complete TASK chains for SSIS control flow.
+
+---
+
+## 6. Architecture Design
+
+### 6.1 High-Level Architecture
+
+```mermaid
+flowchart TB
+    subgraph INPUT["Input"]
+        XML["Informatica\nPowerCenter\nXML Exports"]
+    end
+
+    subgraph FRAMEWORK["infa2dbt Framework (Local Python)"]
+        direction TB
+        PARSE["XML Parser\n30+ transform types"]
+        ANALYZE["Complexity Analyzer\n11-dimension scoring"]
+        CACHE_CHK{{"Cache\nCheck"}}
+        CHUNK["Token-Aware\nChunker"]
+        GENERATE["LLM Code\nGenerator"]
+        POSTPROC["Post-Processor\n15+ pattern fixes"]
+        VALIDATE_S["Static Validator\n9 SQL checks"]
+        HEAL{{"Self-Healing\nLoop"}}
+        SCORE["Quality Scorer\n5-dimension 0-100"]
+        CACHE_ST["Cache Store\nSHA-256"]
+        MERGE["Project Merger\nConsolidate into\none dbt project"]
+    end
+
+    subgraph SNOWFLAKE["Snowflake"]
+        CORTEX["Cortex LLM"]
+        COMPILE["dbt compile\n+ run + test"]
+        DEPLOY_SF["Snowflake-Native\ndbt Project"]
+    end
+
+    subgraph OUTPUT["Output"]
+        PROJECT["Production-Ready\ndbt Project"]
+        REPORTS["EWI Assessment\nReports"]
+        GIT["Git Repository"]
+    end
+
+    XML --> PARSE
+    PARSE --> ANALYZE
+    ANALYZE --> CACHE_CHK
+    CACHE_CHK -->|"Hit"| MERGE
+    CACHE_CHK -->|"Miss"| CHUNK
+    CHUNK --> GENERATE
+    GENERATE -.->|"LLM call"| CORTEX
+    CORTEX -.->|"response"| POSTPROC
+    POSTPROC --> VALIDATE_S
+    VALIDATE_S -->|"Errors"| HEAL
+    HEAL -.->|"LLM call"| CORTEX
+    VALIDATE_S -->|"Pass"| SCORE
+    SCORE --> CACHE_ST
+    CACHE_ST --> MERGE
+    MERGE --> PROJECT
+    PROJECT --> COMPILE
+    COMPILE -.-> DEPLOY_SF
+    PROJECT --> REPORTS
+    PROJECT --> GIT
+
+    style INPUT fill:#fce4ec,stroke:#E74C3C,color:#000
+    style FRAMEWORK fill:#e8eaf6,stroke:#3F51B5,color:#000
+    style SNOWFLAKE fill:#e8f5e9,stroke:#388E3C,color:#000
+    style OUTPUT fill:#fff3e0,stroke:#F5A623,color:#000
+    style XML fill:#E74C3C,stroke:#C0392B,color:#fff
+    style CORTEX fill:#F5A623,stroke:#C47D1A,color:#fff
+    style DEPLOY_SF fill:#7ED321,stroke:#5A9A18,color:#fff
+    style PROJECT fill:#7ED321,stroke:#5A9A18,color:#fff
+    style GENERATE fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style HEAL fill:#F5A623,stroke:#C47D1A,color:#fff
+    style CACHE_CHK fill:#9B59B6,stroke:#6C3483,color:#fff
+```
+
+### 6.2 What Runs Where
+
+| Operation | Where It Runs | Requires Snowflake? |
+|-----------|--------------|---------------------|
+| XML parsing | Local Python | No |
+| Complexity analysis | Local Python | No |
+| Token-aware chunking | Local Python | No |
+| LLM code generation | Snowflake Cortex (via `SNOWFLAKE.CORTEX.COMPLETE()`) | **Yes** |
+| Post-processing | Local Python | No |
+| Static validation (SQL/YAML) | Local Python | No |
+| Self-healing (LLM) | Snowflake Cortex | **Yes** |
+| Quality scoring | Local Python | No |
+| Output caching | Local filesystem (SHA-256) | No |
+| Project merging | Local Python | No |
+| Schema discovery | Snowflake `INFORMATION_SCHEMA` or local XML/JSON | Optional |
+| dbt compile / run / test | Snowflake (via dbt adapter) | **Yes** |
+| EWI report generation | Local Python | No |
+| Git operations | Local git CLI | No |
+| Snowflake deployment | Snowflake (via `snow` CLI or SQL) | **Yes** |
+
+### 6.3 Component Architecture
+
+```mermaid
+flowchart TB
+    CLI["CLI (cli.py)\ninfa2dbt convert | discover | report |\nvalidate | deploy | git-push | cache | version"]
+
+    CLI --> PARSER["XML Parser\nparser.py + models.py +\ndependency_graph.py"]
+    CLI --> DISCO["Schema Discovery\nschema_discovery.py +\nxml_inventory.py"]
+    CLI --> REPORT["EWI Report Generator\newi_report.py"]
+    CLI --> VALID["dbt Validator\ndbt_validator.py\n(compile + run + test)"]
+    CLI --> DEPLOYER["Deployer\ndeployer.py\n(direct + git + schedule)"]
+    CLI --> GITM["Git Manager\ngit_manager.py\n(commit + push)"]
+    CLI --> CACHM["Cache Manager\nconversion_cache.py\n(list + clear + stats)"]
+
+    PARSER --> ORCH["Orchestrator (orchestrator.py)\nanalyze → cache check → chunk →\nLLM generate → post-process →\nvalidate → self-heal → score → cache"]
+
+    ORCH --> MERGER["Project Merger\nproject_merger.py +\nsource_consolidator.py +\nconflict_resolver.py"]
+
+    style CLI fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style PARSER fill:#9B59B6,stroke:#6C3483,color:#fff
+    style DISCO fill:#9B59B6,stroke:#6C3483,color:#fff
+    style REPORT fill:#9B59B6,stroke:#6C3483,color:#fff
+    style VALID fill:#F5A623,stroke:#C47D1A,color:#fff
+    style DEPLOYER fill:#7ED321,stroke:#5A9A18,color:#fff
+    style GITM fill:#7ED321,stroke:#5A9A18,color:#fff
+    style CACHM fill:#9B59B6,stroke:#6C3483,color:#fff
+    style ORCH fill:#F5A623,stroke:#C47D1A,color:#fff
+    style MERGER fill:#F5A623,stroke:#C47D1A,color:#fff
+```
+
+---
+
+## 7. Component Deep-Dive
+
+### 7.1 XML Parser
+
+**Purpose**: Parse any Informatica PowerCenter XML export into a structured data model.
+
+**Modules**:
+- `xml_parser/parser.py` — Main parser. Reads XML and constructs a `Repository` model.
+- `xml_parser/models.py` — Data classes: `Repository`, `Workflow`, `Mapping`, `Transformation`, `Source`, `Target`, `Connector`, `Shortcut`.
+- `xml_parser/dependency_graph.py` — Builds a NetworkX DAG from transformation links.
+
+**Capabilities**:
+- Parses all Informatica PowerCenter XML element types (REPOSITORY, FOLDER, WORKFLOW, SESSION, MAPPING, TRANSFORMATION, INSTANCE, CONNECTOR, TARGETFIELD, SOURCEFIELD, etc.)
+- Extracts 30+ transformation types with their properties, ports, and expressions
+- Builds a dependency graph showing data flow between transformations
+- Handles shortcuts, reusable objects, and nested XML structures
+
+### 7.2 Complexity Analyzer
+
+**Purpose**: Score each mapping's complexity across 11 dimensions and assign a conversion strategy.
+
+**Module**: `analyzer/complexity.py`
+
+**Scoring Dimensions** (each 0-100):
+
+| Dimension | What It Measures |
+|-----------|-----------------|
+| Source count | Number of source tables |
+| Target count | Number of target tables |
+| Transform count | Number of transformation objects |
+| Lookup count | Number of Lookup transforms |
+| Expression complexity | Nested function depth and expression length |
+| Join complexity | Number and type of joins |
+| Router/Filter count | Conditional branching complexity |
+| Aggregation depth | GROUP BY nesting and aggregate function count |
+| Update strategy | Incremental/merge vs full load |
+| Port count | Total number of input/output ports |
+| DAG depth | Longest path in the transformation dependency graph |
+
+**Strategy Selection**:
+
+| Score Range | Strategy | dbt Output |
+|-------------|----------|------------|
+| 0-25 | DIRECT | Staging only (single `stg_` view) |
+| 26-50 | STAGED | Staging + intermediate |
+| 51-75 | LAYERED | Staging + intermediate + marts |
+| 76-100 | COMPLEX | Full 3-layer with incremental, custom macros |
+
+### 7.3 Transformation Registry
+
+**Purpose**: Map each Informatica transform type to its dbt pattern equivalent.
+
+**Module**: `analyzer/transformation_registry.py`
+
+The registry maps 30+ Informatica transformation types to dbt SQL patterns, providing the LLM with type-specific generation instructions. This ensures consistent output regardless of the LLM model used.
+
+### 7.4 LLM Code Generator
+
+**Purpose**: Generate dbt SQL and YAML files from parsed Informatica metadata using Snowflake Cortex LLM.
+
+**Modules**:
+- `generator/llm_client.py` — Calls `SNOWFLAKE.CORTEX.COMPLETE()` via Snowflake connection
+- `generator/prompt_builder.py` — Builds dynamic prompts with mapping metadata, schema context, complexity score, and strategy-specific instructions
+- `generator/response_parser.py` — Extracts individual SQL/YAML files from LLM response
+- `generator/dbt_project_generator.py` — Generates `dbt_project.yml`, `profiles.yml`, `packages.yml`
+
+**How it works**:
+1. The prompt builder constructs a comprehensive prompt including: conversion rules, few-shot examples, source schema definitions, transformation metadata, and strategy-specific instructions
+2. For large mappings, the chunker splits the input while preserving transformation chains
+3. The LLM generates complete dbt model SQL and YAML schema files
+4. The response parser extracts and validates individual files from the LLM output
+
+### 7.5 Self-Healing Loop
+
+**Purpose**: Automatically detect and correct errors in LLM-generated code.
+
+**Process**:
+
+```mermaid
+flowchart LR
+    A["LLM Output"] --> B["Validate\n(9 SQL checks +\nYAML + project)"]
+    B -->|"Pass"| C["Accept"]
+    B -->|"Errors"| D["Send errors\nback to LLM"]
+    D --> E["LLM corrects"]
+    E --> B
+    D -.->|"Max 2 attempts"| F["Accept with\nEWI warnings"]
+
+    style A fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style B fill:#F5A623,stroke:#C47D1A,color:#fff
+    style C fill:#7ED321,stroke:#5A9A18,color:#fff
+    style D fill:#E74C3C,stroke:#C0392B,color:#fff
+    style E fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style F fill:#F5A623,stroke:#C47D1A,color:#fff
+```
+
+The self-healing loop:
+1. Validates the LLM output against 9 SQL checks, YAML structure rules, and project-level constraints
+2. If errors are found, constructs an error correction prompt with the specific failures
+3. Sends the errors back to the LLM for correction (up to 2 attempts)
+4. If still failing after 2 attempts, accepts the output with EWI warnings in the assessment report
+
+### 7.6 Post-Processor
+
+**Purpose**: Clean common LLM output issues and convert Informatica-specific syntax to Snowflake SQL.
+
+**Module**: `generator/post_processor.py`
+
+**Pattern Replacements** (15+):
+
+| Informatica Pattern | Snowflake Replacement |
+|---------------------|----------------------|
+| `IIF(condition, true, false)` | `IFF(condition, true, false)` |
+| `ISNULL(expr)` | `expr IS NULL` or `IFNULL(expr, default)` |
+| `DECODE(expr, val1, res1, ...)` | `DECODE(expr, val1, res1, ...)` (same syntax) |
+| `ADD_TO_DATE(date, 'DD', n)` | `DATEADD('DAY', n, date)` |
+| `GET_DATE_PART(date, 'MM')` | `DATE_PART('MONTH', date)` |
+| `SESSSTARTTIME` | `CURRENT_TIMESTAMP()` |
+| `SYSDATE` | `CURRENT_TIMESTAMP()` |
+| `TO_INTEGER(expr)` | `TO_NUMBER(expr)` |
+| `IS_NUMBER(expr)` | `TRY_TO_NUMBER(expr) IS NOT NULL` |
+| `IS_DATE(expr)` | `TRY_TO_DATE(expr) IS NOT NULL` |
+
+### 7.7 Quality Scorer
+
+**Purpose**: Score every generated mapping on a 0-100 scale across 5 dimensions.
+
+**Module**: `generator/quality_scorer.py`
+
+| Dimension | Weight | What It Measures |
+|-----------|--------|-----------------|
+| Correctness | 30% | SQL syntax validity, ref/source accuracy, column alignment |
+| Completeness | 25% | All source fields mapped, all transforms covered |
+| Style | 15% | dbt naming conventions, CTE usage, formatting |
+| Performance | 15% | Materialization choice, incremental logic, join efficiency |
+| Testability | 15% | Schema tests generated, coverage depth |
+
+### 7.8 Output Caching
+
+**Purpose**: Ensure deterministic re-runs by caching LLM output keyed to XML content.
+
+**Module**: `cache/conversion_cache.py`
+
+**Cache key** = SHA-256 hash of: `XML content + converter_version + prompt_version + LLM model name`
+
+- **Before LLM call**: Check `.infa2dbt/cache/<hash>/` — if hit, return cached output (skip LLM entirely)
+- **After LLM call**: Persist output to cache directory
+- **CLI management**: `infa2dbt cache list`, `infa2dbt cache clear --yes`, `infa2dbt cache stats`
+
+### 7.9 Schema Discovery
+
+**Purpose**: Automatically discover source table schemas instead of requiring manual JSON files.
+
+**Module**: `discovery/schema_discovery.py`
+
+**Three modes**:
+
+| Mode | Command | Source |
+|------|---------|--------|
+| Snowflake | `--schema-source snowflake --database DB --schema SCHEMA` | Queries `INFORMATION_SCHEMA.COLUMNS` |
+| XML | `--schema-source xml` | Extracts column definitions from Informatica XML |
+| JSON | `--schema-source json --json-path ./source_map.json` | Reads pre-built JSON file (backward compatible) |
+
+### 7.10 Project Merger
+
+**Purpose**: Consolidate individual mapping outputs into one unified dbt project.
+
+**Modules**:
+- `merger/project_merger.py` — Core merge logic (new project scaffold + merge into existing)
+- `merger/source_consolidator.py` — Deduplicate `_sources.yml` across mappings
+- `merger/conflict_resolver.py` — Handle naming conflicts between mappings
+
+**Two modes**:
+- **`--mode new`**: Create a fresh dbt project with `dbt_project.yml`, `profiles.yml`, `packages.yml`, and directory structure
+- **`--mode merge`**: Add a new mapping into an existing project, merging variables, sources, macros, and model directories
+
+### 7.11 EWI Report Generator
+
+**Purpose**: Generate Errors/Warnings/Informational assessment reports for conversion transparency.
+
+**Module**: `reports/ewi_report.py`
+
+**Output formats**: HTML (visual) and JSON (machine-readable)
+
+**Report contents**:
+- Conversion summary: total mappings, models, tests, pass rate
+- Per-mapping breakdown: complexity score, strategy, files generated, EWIs
+- Quality scores across all mappings
+- Unsupported patterns flagged as Warnings or Errors
+
+### 7.12 Deployer
+
+**Purpose**: Deploy the dbt project to Snowflake using one of three modes.
+
+**Module**: `deployment/deployer.py`
+
+| Mode | Method | Use Case |
+|------|--------|----------|
+| `direct` | `snow dbt deploy` — pushes project to Snowflake internal stage | Simplest deployment, good for development and demos |
+| `git` | Creates Snowflake Git Repository integration, deploys from it | Production: Snowflake pulls latest from Git on each run |
+| `schedule` | Creates Snowflake TASK with cron schedule | Automated recurring execution (e.g. daily at 2 AM) |
+
+### 7.13 Git Manager
+
+**Purpose**: Version-control the generated dbt project.
+
+**Module**: `git/git_manager.py`
+
+**Operations**:
+- Initialize a Git repo if not already present
+- Stage all dbt project files
+- Commit with descriptive message (auto-generated or user-provided)
+- Push to any Git remote (GitHub, GitLab, Azure DevOps, Bitbucket)
+- Add/update remote URL
+
+---
+
+## 8. Pipeline Execution Flow
+
+### 8.1 End-to-End Pipeline
+
+```mermaid
+flowchart LR
+    A["convert\nParse XML +\nGenerate dbt"] --> B["discover\nInventory +\nSchema discovery"]
+    B --> C["report\nEWI assessment\nHTML + JSON"]
+    C --> D["validate\nCompile + Run\n+ Test"]
+    D --> E["deploy\nSnowflake-native\ndbt project"]
+    E --> F["execute\nsnow dbt execute\nrun + test"]
+    F --> G["git-push\nCommit + Push\nto repository"]
+
+    style A fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style B fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style C fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style D fill:#F5A623,stroke:#C47D1A,color:#fff
+    style E fill:#7ED321,stroke:#5A9A18,color:#fff
+    style F fill:#7ED321,stroke:#5A9A18,color:#fff
+    style G fill:#9B59B6,stroke:#6C3483,color:#fff
+```
+
+### 8.2 Pipeline Stage Details
+
+| Stage | CLI Command | What It Does | Input | Output |
+|-------|-------------|-------------|-------|--------|
+| 1. Convert | `infa2dbt convert` | Parses XML, analyzes complexity, calls Cortex LLM, validates, self-heals, scores, caches, merges into project | XML files | dbt project directory |
+| 2. Discover | `infa2dbt discover` | Scans XML directory for inventory, discovers source schemas from Snowflake/XML/JSON | XML files | Inventory + schema metadata |
+| 3. Report | `infa2dbt report` | Generates EWI assessment report from conversion metrics | Conversion metrics JSON | HTML + JSON reports |
+| 4. Validate | `infa2dbt validate` | Runs `dbt compile`, `dbt run`, and `dbt test` against Snowflake | dbt project | Pass/fail results |
+| 5. Deploy | `infa2dbt deploy` | Deploys to Snowflake as a native dbt project object | dbt project | Snowflake dbt project object |
+| 6. Execute | `snow dbt execute` | Runs models and tests natively on Snowflake | Deployed project | Materialized views + tables |
+| 7. Git Push | `infa2dbt git-push` | Commits and pushes to Git repository | dbt project | Git commit + push |
+
+---
+
+## 9. dbt Project Output Structure
+
+The framework generates a single consolidated dbt project with all mappings organized by directory:
 
 ```
 dbt_project/
-├── dbt_project.yml            # Project config: name, vars (32 lookups)
-├── profiles.yml               # Snowflake connection (no password for native)
-├── packages.yml               # dbt_utils v1.3.0
-├── macros/
-│   ├── generate_md5_hash.sql  # MD5 hash macro for change detection
-│   └── hash_md5_50_fields.sql # Extended hash for wide tables
+├── dbt_project.yml              # Project config with per-mapping model settings and lookup vars
+├── profiles.yml                 # Snowflake connection configuration
+├── macros/                      # Shared macros (deduplicated across all mappings)
+│   └── *.sql
 ├── models/
-│   ├── m_BL_FF_ZJ_JOURNALS_STG/   # Journal staging pipeline
-│   │   ├── staging/                # stg_f0911_jnl_stg, stg_f0901_jnl_stg, ...
-│   │   │   ├── _stg__schema.yml
-│   │   │   └── _sources.yml       # Consolidated sources (oracle_raw + flat_file_raw)
-│   │   ├── intermediate/           # int_journals_base, int_journals_reverse, ...
-│   │   │   └── _int__schema.yml
-│   │   └── marts/                  # fct_zj_journals_staging, fct_zj_journals_flat_file
-│   │       └── _marts__schema.yml
-│   ├── m_BL_FF_ZJ_JOURNALS/       # Journal final pipeline
-│   ├── m_INCR_DM_DIM_EQUIPMENT/   # Equipment dimension pipeline
-│   ├── m_DI_ITEM_MTRL_MASTER/     # Material master pipeline
-│   ├── m_AM_DI_CUSTOMER/          # Customer staging
-│   ├── m_AP_FF_CITIBANK_VCA/      # Citibank VCA staging
-│   ├── m_CM_Z1_DAILY_SALES_FEED/  # Sales feed staging
-│   ├── m_FF_AT_Z1_GL_ACCOUNT/     # GL Account Z1 staging
-│   └── m_FF_AT_ZJ_GL_ACCOUNT/     # GL Account ZJ staging
+│   ├── <mapping_name>/          # One directory per Informatica mapping
+│   │   ├── staging/             # Source views + schema tests
+│   │   │   ├── _sources.yml    # Source table definitions
+│   │   │   ├── _stg__schema.yml # Column-level tests
+│   │   │   └── stg_*.sql       # Staging models (one per source table)
+│   │   ├── intermediate/        # Business logic (optional, per complexity)
+│   │   │   ├── _int__schema.yml
+│   │   │   └── int_*.sql       # Join, filter, aggregate, lookup models
+│   │   └── marts/               # Final tables (optional, per complexity)
+│   │       ├── _marts__schema.yml
+│   │       └── fct_*.sql / dim_*.sql  # Fact and dimension tables
+│   └── <another_mapping>/       # Another mapping
+│       └── ...
+├── reports/                     # EWI assessment reports (HTML + JSON)
 ├── seeds/
 ├── snapshots/
-├── tests/
-└── analyses/
+└── tests/
 ```
 
-### 5.2 Project Configuration (`dbt_project.yml`)
+### Layered ELT Design
+
+| Layer | Purpose | Materialization | Naming | Generated For |
+|-------|---------|-----------------|--------|---------------|
+| **Staging** | 1:1 from source tables. Column rename, type cast, basic cleaning. | `view` | `stg_<source_table>` | Every mapping |
+| **Intermediate** | Business logic: joins, lookups, filters, aggregations. Multiple staging models combined. | `view` | `int_<business_concept>` | STAGED, LAYERED, COMPLEX strategies |
+| **Marts** | Final fact and dimension tables for consumption. Incremental merge for efficiency. | `incremental` / `table` | `fct_<fact>` / `dim_<dimension>` | LAYERED, COMPLEX strategies |
+
+> Not every mapping generates all three layers. Simple mappings (DIRECT strategy) produce only a staging view. Complex mappings generate the full three-layer structure.
+
+### Tag-Based Selective Execution
+
+Each mapping's models are automatically tagged in `dbt_project.yml`:
 
 ```yaml
-name: informatica_to_dbt_migration
-version: 1.0.0
-profile: informatica_to_dbt_migration
-model-paths: [models]
-vars:
-  lkp_Override_IBP_SCOPE_IND: "SELECT KEY_OF_OBJ, CHAR_VALUE FROM TPC_DI_RAW_DATA.MOCK_SOURCES.LKP_OVERRIDE_CHARS"
-  lkp_Override_CE_MARK_IND: "SELECT KEY_OF_OBJ, CHAR_VALUE FROM TPC_DI_RAW_DATA.MOCK_SOURCES.LKP_OVERRIDE_CHARS"
-  # ... 30 more lookup variable definitions
+models:
+  project_name:
+    <mapping_name>:
+      +tags: ['<mapping_name>']
+      staging:
+        +materialized: view
+      intermediate:
+        +materialized: view
+      marts:
+        +materialized: table
 ```
 
-The 32 `vars` entries represent the conversion of Informatica Lookup Transforms. Each variable holds a SQL subquery that models can reference using `{{ var('lkp_Override_...') }}` to perform lookup joins inline.
+This enables running individual mappings:
 
-### 5.3 Package Dependencies
+```bash
+# Run only one mapping
+dbt run --select tag:<mapping_name>
 
-```yaml
-packages:
-  - package: dbt-labs/dbt_utils
-    version: 1.3.0
+# Via Snowflake-native execution
+EXECUTE DBT PROJECT DB.SCHEMA.PROJECT ARGS = 'run --select tag:<mapping_name>';
 ```
-
-Used for: `accepted_range` tests, `surrogate_key` generation, and utility macros.
 
 ---
 
-## 6. Data Flow Architecture
+## 10. Transformation Patterns
 
-> See diagram: [02_data_flow_diagram.html](diagrams/02_data_flow_diagram.html)
-
-### 6.1 Pipeline: Journals Staging (`m_BL_FF_ZJ_JOURNALS_STG`)
-
-**Sources** → **Staging** → **Intermediate** → **Marts**
-
-```
-f0911 (Ledger) ──► stg_f0911_jnl_stg ──┐
-f0901 (Acct)   ──► stg_f0901_jnl_stg ──┤
-f0011 (Batch)  ──► stg_f0011_jnl_stg ──┼──► int_journals_base ──► int_journals_reverse ──────► fct_zj_journals_staging (INCR)
-f0092          ──► stg_f0092 ──────────┤                      └─► int_journals_non_reverse ──► fct_zj_journals_flat_file (TABLE)
-f01151         ──► stg_f01151 ─────────┘
-```
-
-- **Fact table `fct_zj_journals_staging`**: Incremental model with 5-column composite key. Performs `MERGE` on new records, separating reverse and non-reverse journal entries.
-- **Fact table `fct_zj_journals_flat_file`**: Full table rebuild with flat-file journal data.
-
-### 6.2 Pipeline: Equipment Dimension (`m_INCR_DM_DIM_EQUIPMENT`)
-
-```
-8 source tables ──► 8 stg_ views ──► int_equipment_aar_base_source ──┐
-                                      int_equipment_non_registered ────┤
-                                      int_equipment_pool_assignment ──┤
-                                      int_equipment_lookups ──────────┼──► int_equipment_final ──► dim_equipment_soft_delete (INCR)
-                                      int_dim_equipment_soft_delete ──┘
-```
-
-- **Dimension table `dim_equipment_soft_delete`**: Incremental model that performs soft-delete tracking with `EDW_CURRENT_FLG` and `EDW_END_EFCTV_DT` columns.
-
-### 6.3 Pipeline: Material Master (`m_DI_ITEM_MTRL_MASTER`)
-
-```
-XML Material ──► stg_xml_material_attr_txt ──► int_material_lookups (32 var lookups) ──► int_material_transformations
-                 stg_product_descriptions  ──►   ──► int_material_with_lookups ──► int_material_with_md5 ──► int_material_with_flags
-                                                                                                              └──► dim_mtrl_master (INCR)
-```
-
-- **Dimension table `dim_mtrl_master`**: Incremental model with 90+ merge-update columns. Uses `insert_update_flag` ('I', 'U') for change data capture.
-- This pipeline demonstrates the heaviest Informatica-to-dbt conversion, with 32 lookup variables resolved through `dbt var()`.
-
----
-
-## 7. Transformation Patterns
-
-### 7.1 Informatica Lookup → dbt var() Pattern
+### 10.1 Informatica Lookup → dbt var() Pattern
 
 **Before (Informatica):** GUI-based Lookup Transform connecting to a lookup table via cache.
 
@@ -302,16 +806,16 @@ XML Material ──► stg_xml_material_attr_txt ──► int_material_lookups 
 ```yaml
 # dbt_project.yml
 vars:
-  lkp_Override_IBP_SCOPE_IND: "SELECT KEY_OF_OBJ, CHAR_VALUE FROM TPC_DI_RAW_DATA.MOCK_SOURCES.LKP_OVERRIDE_CHARS"
+  lkp_override_ibp_scope: "SELECT KEY_COL, VALUE_COL FROM DB.SCHEMA.LOOKUP_TABLE"
 ```
 
 ```sql
 -- In a model:
-LEFT JOIN ({{ var('lkp_Override_IBP_SCOPE_IND') }}) AS lkp_ibp
-  ON src.product = lkp_ibp.KEY_OF_OBJ
+LEFT JOIN ({{ var('lkp_override_ibp_scope') }}) AS lkp
+  ON src.key_column = lkp.KEY_COL
 ```
 
-### 7.2 Incremental Processing Pattern
+### 10.2 Incremental Processing Pattern
 
 **Before (Informatica):** Full table reload or custom session-level change detection.
 
@@ -320,18 +824,18 @@ LEFT JOIN ({{ var('lkp_Override_IBP_SCOPE_IND') }}) AS lkp_ibp
 ```sql
 {{ config(
     materialized='incremental',
-    unique_key='DIM_EQUIPMENT_ID',
-    merge_update_columns=['EDW_UPDATE_USER', 'EDW_UPDATE_TMS', 'EDW_END_EFCTV_DT', 'EDW_CURRENT_FLG']
+    unique_key='DIMENSION_ID',
+    merge_update_columns=['UPDATE_USER', 'UPDATE_TIMESTAMP', 'END_DATE', 'CURRENT_FLAG']
 ) }}
 
-SELECT ... FROM {{ ref('int_dim_equipment_soft_delete') }}
+SELECT ... FROM {{ ref('int_dimension_final') }}
 
 {% if is_incremental() %}
-WHERE EDW_UPDATE_TMS > (SELECT MAX(EDW_UPDATE_TMS) FROM {{ this }})
+WHERE UPDATE_TIMESTAMP > (SELECT MAX(UPDATE_TIMESTAMP) FROM {{ this }})
 {% endif %}
 ```
 
-### 7.3 MD5 Change Detection Pattern
+### 10.3 MD5 Change Detection Pattern
 
 **Before (Informatica):** Expression Transform computing hash for change detection.
 
@@ -348,510 +852,325 @@ WHERE EDW_UPDATE_TMS > (SELECT MAX(EDW_UPDATE_TMS) FROM {{ this }})
 {% endmacro %}
 ```
 
-### 7.4 Router/Filter → UNION ALL Pattern
+### 10.4 Router/Filter → UNION ALL Pattern
 
 **Before (Informatica):** Router Transform splitting data into groups based on conditions.
 
 **After (dbt):** CTEs with conditional filters, combined via `UNION ALL`.
 
 ```sql
--- Reverse records group
-WITH reverse_records AS (
-    SELECT ... FROM {{ ref('int_journals_reverse') }}
+WITH group_a AS (
+    SELECT ... FROM {{ ref('int_records_filtered') }}
+    WHERE condition_a = 'Y'
 ),
--- Non-reverse records group
-non_reverse_records AS (
-    SELECT ... FROM {{ ref('int_journals_non_reverse') }}
+group_b AS (
+    SELECT ... FROM {{ ref('int_records_filtered') }}
+    WHERE condition_a = 'N'
 )
-SELECT * FROM reverse_records
+SELECT * FROM group_a
 UNION ALL
-SELECT * FROM non_reverse_records
+SELECT * FROM group_b
+```
+
+### 10.5 Source Qualifier → source() Pattern
+
+**Before (Informatica):** Source Qualifier reading from a database table.
+
+**After (dbt):** `source()` macro referencing the source YAML definition.
+
+```sql
+-- staging/stg_orders.sql
+{{ config(materialized='view') }}
+
+SELECT
+    ORDER_ID,
+    CUSTOMER_ID,
+    TO_DATE(ORDER_DATE) AS ORDER_DATE,
+    CAST(AMOUNT AS DECIMAL(18,2)) AS AMOUNT
+FROM {{ source('source_system', 'orders_table') }}
 ```
 
 ---
 
-## 8. Snowflake-Native Deployment
+## 11. Testing and Quality Assurance
 
-> See diagram: [04_snowflake_deployment_architecture.html](diagrams/04_snowflake_deployment_architecture.html)
+### 11.1 Auto-Generated Test Types
 
-### 8.1 Deployment Architecture
+The framework automatically generates data quality tests for every model:
 
-The dbt project is deployed as a **Snowflake-native dbt project object**, not as a local CLI-based project. This means:
+| Test Type | Purpose | Example |
+|-----------|---------|---------|
+| `not_null` | Ensure required columns never contain NULL | Primary keys, required business fields |
+| `unique` | Ensure column values are unique | Primary keys, natural keys |
+| `accepted_values` | Validate column values against an allowed set | Status codes ('Y'/'N'), type codes ('I'/'U'/'E') |
+| `relationships` | Verify foreign key integrity between models | Staging → source, mart → intermediate |
+| `dbt_utils.accepted_range` | Validate numeric values fall within expected range | Amounts > 0, quantities between 0-10000 |
 
-- The entire dbt project (1,545 files) is uploaded to a Snowflake internal stage
-- Snowflake manages the dbt runtime (dbt-core 1.9.4, snowflake adapter 1.9.2)
-- No external compute or CI/CD infrastructure required for execution
-- Project is versioned (VERSION$1) and can be updated with new deployments
-
-### 8.2 Snowflake Objects Created
-
-| Object Type | Name | Description |
-|-------------|------|-------------|
-| **Database** | `TPC_DI_RAW_DATA` | Contains all schemas |
-| **Schema** | `MOCK_SOURCES` | 38 source tables (Oracle + flat files) |
-| **Schema** | `DBT_INGEST` | 51 dbt-created objects + native project |
-| **dbt Project** | `INFORMATICA_TO_DBT` | Native project object (VERSION$1) |
-| **Warehouse** | `SMALL_WH` | Compute warehouse (Small, auto-suspend 60s) |
-| **Views** | 44 views | Staging + intermediate layer models |
-| **Tables** | 3 tables | Fact tables (full rebuild) |
-| **Incremental Tables** | 4 tables | Fact + dimension tables (merge) |
-
-### 8.3 Execution Methods
-
-**Method 1: Snowflake CLI**
-```bash
-# Compile
-snow dbt execute -c myconnection --database TPC_DI_RAW_DATA --schema DBT_INGEST INFORMATICA_TO_DBT compile
-
-# Run
-snow dbt execute -c myconnection --database TPC_DI_RAW_DATA --schema DBT_INGEST INFORMATICA_TO_DBT run
-
-# Test
-snow dbt execute -c myconnection --database TPC_DI_RAW_DATA --schema DBT_INGEST INFORMATICA_TO_DBT test
-
-# Full refresh (rebuild incremental tables from scratch)
-snow dbt execute -c myconnection --database TPC_DI_RAW_DATA --schema DBT_INGEST INFORMATICA_TO_DBT run --args='--full-refresh'
-```
-
-**Method 2: SQL (from Snowsight or any SQL client)**
-```sql
--- Run all models
-EXECUTE DBT PROJECT TPC_DI_RAW_DATA.DBT_INGEST.INFORMATICA_TO_DBT ARGS = 'run';
-
--- Run tests
-EXECUTE DBT PROJECT TPC_DI_RAW_DATA.DBT_INGEST.INFORMATICA_TO_DBT ARGS = 'test';
-
--- Compile only
-EXECUTE DBT PROJECT TPC_DI_RAW_DATA.DBT_INGEST.INFORMATICA_TO_DBT ARGS = 'compile';
-```
-
-**Method 3: Snowsight UI**
-1. Navigate to **Data** → **Databases** → **TPC_DI_RAW_DATA** → **DBT_INGEST** → **dbt Projects** → **INFORMATICA_TO_DBT**
-2. Use built-in controls to compile, run, and test
-3. View the DAG (dependency graph) for visual lineage
-
-### 8.4 Scheduling (Production Readiness)
-
-For production use, the dbt project can be scheduled using Snowflake Tasks:
-
-```sql
-CREATE TASK dbt_nightly_run
-  WAREHOUSE = SMALL_WH
-  SCHEDULE = 'USING CRON 0 2 * * * America/New_York'
-AS
-  EXECUTE DBT PROJECT TPC_DI_RAW_DATA.DBT_INGEST.INFORMATICA_TO_DBT ARGS = 'run';
-```
-
----
-
-## 9. Testing Strategy
-
-### 9.1 Test Coverage Summary
-
-| Test Type | Count | Examples |
-|-----------|-------|---------|
-| `not_null` | ~60 | Primary keys, required business fields |
-| `unique` | ~30 | Primary keys, natural keys |
-| `accepted_values` | ~40 | Status codes ('Y'/'N'), type codes ('I'/'U'/'E') |
-| `relationships` | ~20 | Foreign key integrity between models |
-| `dbt_utils.accepted_range` | ~20 | Numeric range validation (amounts, quantities) |
-| **Total** | **170** | |
-
-### 9.2 Test Example
+### 11.2 Test Example
 
 ```yaml
 version: 2
 models:
-  - name: fct_zj_journals_staging
+  - name: dim_equipment
     columns:
-      - name: f0911_gldct
+      - name: EQUIPMENT_ID
         tests:
           - not_null
           - unique
-      - name: f0911_glpost
+      - name: CURRENT_FLAG
         tests:
           - accepted_values:
-              values: ['P']
+              values: ['Y', 'N']
+      - name: STATUS_CODE
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['ACTIVE', 'INACTIVE', 'RETIRED']
+```
+
+### 11.3 Validation Pipeline
+
+```mermaid
+flowchart LR
+    A["dbt compile\nSQL syntax +\nref/source resolution"] --> B["dbt run\nMaterialize all\nmodels in Snowflake"]
+    B --> C["dbt test\nExecute all\ndata quality tests"]
+    C --> D{{"All Pass?"}}
+    D -->|"Yes"| E["Ready to Deploy"]
+    D -->|"No"| F["Review Failures\n+ Fix"]
+
+    style A fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style B fill:#F5A623,stroke:#C47D1A,color:#fff
+    style C fill:#F5A623,stroke:#C47D1A,color:#fff
+    style D fill:#9B59B6,stroke:#6C3483,color:#fff
+    style E fill:#7ED321,stroke:#5A9A18,color:#fff
+    style F fill:#E74C3C,stroke:#C0392B,color:#fff
 ```
 
 ---
 
-## 10. Key Design Decisions
+## 12. Deployment Architecture
 
-### 10.1 Lookup Conversion Strategy
+### 12.1 Deployment Modes
 
-**Decision:** Convert Informatica Lookup Transforms to `dbt var()` with SQL subqueries.
+```mermaid
+flowchart TB
+    PROJECT["dbt Project\n(local filesystem)"]
 
-**Rationale:** Informatica lookups are essentially cached SELECT statements. By storing the SQL as dbt project variables, models can reference them via `LEFT JOIN ({{ var('lkp_...') }})`. This preserves the lookup semantics while making them transparent, testable, and version-controlled.
+    PROJECT --> DIRECT["Direct Deploy\nsnow dbt deploy\n→ Snowflake internal stage"]
+    PROJECT --> GIT_D["Git-Based Deploy\nGit Repository object\n→ Snowflake pulls from Git"]
+    PROJECT --> SCHED["Scheduled Deploy\nSnowflake TASK\n→ Cron-based execution"]
 
-**Trade-off:** 32 variables in `dbt_project.yml` adds configuration complexity, but ensures each lookup is explicitly documented and can be independently modified.
+    DIRECT --> SF["Snowflake-Native\ndbt Project Object"]
+    GIT_D --> SF
+    SCHED --> SF
 
-### 10.2 Materialization Strategy
+    SF --> EXEC["Execution Methods"]
+    EXEC --> CLI_E["Snowflake CLI\nsnow dbt execute"]
+    EXEC --> SQL_E["SQL\nEXECUTE DBT PROJECT"]
+    EXEC --> UI_E["Snowsight UI\nBrowser-based"]
+    EXEC --> TASK_E["Snowflake TASK\nScheduled"]
 
-**Decision:** Use views for staging/intermediate, incremental for dimension/fact marts.
+    style PROJECT fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style DIRECT fill:#7ED321,stroke:#5A9A18,color:#fff
+    style GIT_D fill:#7ED321,stroke:#5A9A18,color:#fff
+    style SCHED fill:#7ED321,stroke:#5A9A18,color:#fff
+    style SF fill:#F5A623,stroke:#C47D1A,color:#fff
+    style CLI_E fill:#9B59B6,stroke:#6C3483,color:#fff
+    style SQL_E fill:#9B59B6,stroke:#6C3483,color:#fff
+    style UI_E fill:#9B59B6,stroke:#6C3483,color:#fff
+    style TASK_E fill:#9B59B6,stroke:#6C3483,color:#fff
+```
 
-| Model Type | Materialization | Reason |
-|-----------|-----------------|--------|
-| Staging (26) | `view` | Lightweight, always reflects latest source data |
-| Intermediate (17) | `view` | Business logic layer, no storage cost |
-| Fact tables (3) | `table` | Full rebuild for non-incremental fact data |
-| Incremental (4) | `incremental` | Efficient MERGE for large dimension/fact tables |
+### 12.2 Snowflake-Native dbt Project
 
-### 10.3 Source Consolidation
+When deployed, the dbt project becomes a first-class Snowflake object:
 
-**Decision:** Single consolidated `_sources.yml` file for all sources.
+- The entire project is uploaded to a Snowflake internal stage
+- Snowflake manages the dbt runtime (no external compute required)
+- Project is versioned (VERSION$1, VERSION$2, etc.) and can be updated
+- Execution is via SQL, CLI, Snowsight UI, or scheduled TASK
+- DAG lineage is visible in the Snowsight interface
 
-**Rationale:** Snowflake-native dbt runtime requires unique source names across the entire project. Multiple files defining `oracle_raw` caused deployment failures. Consolidating into one file in `m_BL_FF_ZJ_JOURNALS_STG/staging/_sources.yml` resolves this while maintaining all 38 table definitions.
+### 12.3 Execution Methods
 
-### 10.4 Native vs Local Deployment
+**Method 1: Snowflake CLI**
+```bash
+snow dbt execute -c <connection> --database <DB> --schema <SCHEMA> <PROJECT> run
+snow dbt execute -c <connection> --database <DB> --schema <SCHEMA> <PROJECT> test
+```
 
-**Decision:** Deploy as Snowflake-native dbt project (not local CLI only).
+**Method 2: SQL (from Snowsight or any SQL client)**
+```sql
+EXECUTE DBT PROJECT DB.SCHEMA.PROJECT_NAME ARGS = 'run';
+EXECUTE DBT PROJECT DB.SCHEMA.PROJECT_NAME ARGS = 'test';
+```
 
-**Rationale:**
-- Enables execution directly from Snowsight UI (no local tooling required)
-- Provides visual DAG in the Snowflake workspace
+**Method 3: Snowsight UI**
+1. Navigate to **Data** → **Databases** → **DB** → **SCHEMA** → **dbt Projects** → **PROJECT**
+2. Use built-in controls to compile, run, and test
+3. View the DAG for visual lineage
+
+**Method 4: Scheduled TASK**
+```sql
+CREATE TASK dbt_nightly_run
+  WAREHOUSE = MY_WH
+  SCHEDULE = 'USING CRON 0 2 * * * America/New_York'
+AS
+  EXECUTE DBT PROJECT DB.SCHEMA.PROJECT_NAME ARGS = 'run';
+```
+
+---
+
+## 13. CLI Reference Summary
+
+The full CLI reference is available in [CLI_Reference.md](CLI_Reference.md).
+
+| Command | Purpose | Key Options |
+|---------|---------|-------------|
+| `infa2dbt convert` | Convert Informatica XML to dbt project | `-i` input, `-o` output, `-m` mode (new/merge), `--connection`, `--source-schema` |
+| `infa2dbt discover` | Inventory XML files and discover schemas | `-i` input, `--schema-source` (xml/snowflake/json), `--database`, `--schema` |
+| `infa2dbt report` | Generate EWI assessment report | `-p` project-dir, `-f` format (html/json/both) |
+| `infa2dbt validate` | Compile, run, and test dbt project | `-p` project, `--run-tests`, `--compile-only`, `-s` select |
+| `infa2dbt deploy` | Deploy to Snowflake | `-p` project, `-d` database, `-s` schema, `--mode` (direct/git/schedule) |
+| `infa2dbt git-push` | Commit and push to Git | `-p` project, `--remote-url`, `-b` branch, `-m` message |
+| `infa2dbt cache` | Manage conversion cache | Subcommands: `list`, `clear` (with `--yes`), `stats` |
+| `infa2dbt version` | Show version | |
+
+### Pipeline Quick Reference
+
+```bash
+# Full end-to-end pipeline
+infa2dbt convert -i ./input/ -o ./output/dbt_project -m new --connection <conn> --source-schema <schema>
+infa2dbt discover -i ./input/ --schema-source snowflake --database <DB> --schema <schema>
+infa2dbt report -p ./output/dbt_project -f both
+infa2dbt validate -p ./output/dbt_project --run-tests
+infa2dbt deploy -p ./output/dbt_project -d <DB> -s <schema> --connection <conn> --mode direct
+snow dbt execute -c <conn> --database <DB> --schema <schema> <PROJECT> run
+snow dbt execute -c <conn> --database <DB> --schema <schema> <PROJECT> test
+infa2dbt git-push -p ./output/dbt_project --remote-url <git_url> -b main
+```
+
+---
+
+## 14. Design Decisions
+
+### 14.1 LLM-Powered vs Rule-Based Conversion
+
+**Decision**: Use Snowflake Cortex LLM instead of hardcoded translation rules.
+
+**Rationale**: Informatica mappings contain deeply nested expressions, conditional logic, and complex transformation chains that are impractical to cover with static rules. An LLM can interpret the semantic intent of the transformation and generate correct Snowflake SQL for patterns it has never seen before. The self-healing loop mitigates the risk of LLM errors.
+
+**Trade-off**: Slower per-mapping (30-60s vs milliseconds), but the cache layer eliminates repeat calls.
+
+### 14.2 Single Consolidated Project vs Separate Projects
+
+**Decision**: Merge all mappings into one dbt project.
+
+**Rationale**: A consolidated project enables cross-mapping `ref()` references, eliminates source definition duplication, shares macros, and requires only one deployment. Separate projects (SnowConvert's approach) cannot reference models across mappings.
+
+**Trade-off**: Requires careful naming to avoid collisions (handled by the conflict resolver).
+
+### 14.3 Lookup Conversion via dbt var()
+
+**Decision**: Convert Informatica Lookup Transforms to `dbt var()` with SQL subqueries.
+
+**Rationale**: Informatica lookups are essentially cached SELECT statements. Storing the SQL as dbt project variables makes them transparent, testable, and independently modifiable.
+
+### 14.4 Materialization Strategy
+
+| Layer | Materialization | Rationale |
+|-------|-----------------|-----------|
+| Staging | `view` | Lightweight, always reflects latest source data, no storage cost |
+| Intermediate | `view` | Business logic layer, no storage cost, computed on demand |
+| Marts (full load) | `table` | Full rebuild for non-incremental fact data |
+| Marts (incremental) | `incremental` | Efficient MERGE for large dimension/fact tables with change tracking |
+
+### 14.5 Snowflake-Native Deployment
+
+**Decision**: Deploy as a Snowflake-native dbt project object.
+
+**Rationale**:
+- Enables execution from Snowsight UI without local tooling
+- Provides visual DAG lineage in the Snowflake workspace
 - Supports scheduling via Snowflake Tasks
 - Eliminates dependency on developer machines for production runs
-- Versioned deployments (VERSION$1, VERSION$2, etc.)
+- Versioned deployments with rollback capability
+
+### 14.6 SHA-256 Caching for Determinism
+
+**Decision**: Cache LLM output keyed to a SHA-256 hash of input XML + converter version + prompt version + model name.
+
+**Rationale**: LLM calls are inherently non-deterministic. The cache ensures that re-running `convert` on the same XML produces identical output without making another LLM call. This is critical for production reproducibility and CI/CD pipelines.
 
 ---
 
-## 11. Deployment Results
-
-### 11.1 Compilation Results
-
-```
-Running with dbt=1.9.4
-Registered adapter: snowflake=1.9.2
-Found 51 models, 1 snapshot, 170 data tests, 38 sources, 592 macros
-```
-
-### 11.2 Execution Results
-
-```
-Finished running 4 incremental models, 3 table models, 44 view models
-  in 0 hours 1 minutes and 9.29 seconds (69.29s).
-
-Completed successfully
-Done. PASS=51 WARN=0 ERROR=0 SKIP=0 TOTAL=51
-```
-
-### 11.3 Object Inventory
-
-| Object | Count | Materialization |
-|--------|-------|-----------------|
-| Views | 44 | `view` |
-| Tables | 3 | `table` |
-| Incremental Tables | 4 | `incremental` (MERGE) |
-| **Total Models** | **51** | |
-| Data Tests | 170 | |
-| Sources | 38 | |
-| Macros | 592 (2 custom + 590 from packages) | |
-
----
-
-## 12. Operational Runbook
-
-### 12.1 Daily Operations
-
-| Task | Command | Frequency |
-|------|---------|-----------|
-| Run all models | `EXECUTE DBT PROJECT TPC_DI_RAW_DATA.DBT_INGEST.INFORMATICA_TO_DBT ARGS = 'run';` | Daily |
-| Run tests | `EXECUTE DBT PROJECT TPC_DI_RAW_DATA.DBT_INGEST.INFORMATICA_TO_DBT ARGS = 'test';` | After each run |
-| Full refresh (incremental rebuild) | `EXECUTE DBT PROJECT TPC_DI_RAW_DATA.DBT_INGEST.INFORMATICA_TO_DBT ARGS = 'run --full-refresh';` | As needed |
-
-### 12.2 Updating the Project
-
-When models need to be modified:
-
-1. Edit model SQL files locally in `dbt_project/models/`
-2. Test locally: `dbt compile && dbt run && dbt test`
-3. Redeploy to Snowflake:
-   ```bash
-   snow dbt deploy INFORMATICA_TO_DBT \
-     --source /path/to/dbt_project \
-     --database TPC_DI_RAW_DATA \
-     --schema DBT_INGEST \
-     -c myconnection
-   ```
-4. Verify: `SHOW VERSIONS IN DBT PROJECT TPC_DI_RAW_DATA.DBT_INGEST.INFORMATICA_TO_DBT;`
-
-### 12.3 Monitoring
-
-- **Snowsight**: Navigate to the dbt project object to view run history, logs, and DAG
-- **Query History**: All dbt model executions appear in `SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY`
-- **Alerts**: Configure Snowflake Alerts on task failure for scheduled runs
-
----
-
-## 13. Generic Framework Architecture
-
-The migration framework is designed as a **generic, reusable CLI tool** (`infa2dbt`) that converts any Informatica PowerCenter XML exports into production-ready dbt projects. Unlike rule-based tools, it uses **Snowflake Cortex LLM** for intelligent code generation with a self-healing validation loop.
-
-### 13.1 Framework Module Map
+## Framework Module Map
 
 ```
 informatica_to_dbt/
-├── cli.py                          # Click CLI — 7 commands (convert, discover, cache, validate, git-push, deploy, version)
-├── config.py                       # Central configuration (database, schema, LLM model, cache, Git)
-├── orchestrator.py                 # Main pipeline: XML → analyze → chunk → LLM → validate → output
-├── metrics.py                      # Per-mapping and repository-level metrics collection
-├── exceptions.py                   # Error hierarchy with 6 categories (INPUT, LLM, PARSE, VALIDATION, PERSISTENCE, INTERNAL)
+├── cli.py                          # Click CLI — 8 commands
+├── config.py                       # Central configuration
+├── orchestrator.py                 # Main pipeline orchestrator
+├── metrics.py                      # Per-mapping metrics collection
+├── exceptions.py                   # Error hierarchy (6 categories)
 │
-├── xml_parser/                     # Phase 0: Parse Informatica PowerCenter XML
-│   ├── parser.py                   #   XML → Repository model (mappings, transforms, sources, targets)
-│   ├── models.py                   #   Data classes: Repository, Workflow, Mapping, Transformation, etc.
-│   └── dependency_graph.py         #   DAG extraction from XML transformation links
+├── xml_parser/                     # XML parsing
+│   ├── parser.py                   #   XML → Repository model
+│   ├── models.py                   #   Data classes
+│   └── dependency_graph.py         #   DAG extraction
 │
-├── analyzer/                       # Phase 1: Complexity analysis & strategy selection
-│   ├── complexity.py               #   11-dimension scoring (0-100) → DIRECT/STAGED/LAYERED/COMPLEX
-│   ├── multi_workflow.py           #   Multi-workflow enrichment with cross-mapping metadata
-│   └── transformation_registry.py  #   30+ Informatica transform types → dbt pattern mapping
+├── analyzer/                       # Complexity analysis
+│   ├── complexity.py               #   11-dimension scoring
+│   ├── multi_workflow.py           #   Cross-mapping enrichment
+│   └── transformation_registry.py  #   30+ transform type mapping
 │
-├── chunker/                        # Phase 2: Token-aware chunking for large mappings
-│   └── context_preserving.py       #   Split while preserving transformation chains (128K limit)
+├── chunker/                        # Token-aware chunking
+│   └── context_preserving.py       #   Split while preserving chains
 │
-├── generator/                      # Phase 3: LLM-powered dbt code generation
-│   ├── llm_client.py              #   Snowflake Cortex LLM calls (claude-4-sonnet)
-│   ├── prompt_builder.py          #   Dynamic prompt construction with schema + complexity context
-│   ├── response_parser.py         #   Extract SQL/YAML files from LLM response
-│   ├── post_processor.py          #   Fix common LLM output issues (refs, naming, formatting)
-│   ├── quality_scorer.py          #   Score generated code quality (0-100)
-│   └── dbt_project_generator.py   #   Generate dbt_project.yml, profiles.yml, packages.yml
+├── generator/                      # LLM code generation
+│   ├── llm_client.py              #   Snowflake Cortex calls
+│   ├── prompt_builder.py          #   Dynamic prompt construction
+│   ├── response_parser.py         #   File extraction from LLM output
+│   ├── post_processor.py          #   15+ pattern replacements
+│   ├── quality_scorer.py          #   5-dimension quality scoring
+│   └── dbt_project_generator.py   #   Project config generation
 │
-├── validator/                      # Phase 4a: Static validation (no Snowflake needed)
-│   ├── sql_validator.py           #   SQL syntax and ref/source validation
-│   ├── yaml_validator.py          #   YAML structure and schema validation
-│   └── project_validator.py       #   dbt project structure validation
+├── validator/                      # Static validation
+│   ├── sql_validator.py           #   9 SQL checks
+│   ├── yaml_validator.py          #   YAML structure validation
+│   └── project_validator.py       #   Project-level validation
 │
-├── validation/                     # Phase 4b: Live validation (requires Snowflake)
-│   └── dbt_validator.py           #   dbt compile / dbt run / dbt test subprocess wrapper
+├── validation/                     # Live validation
+│   └── dbt_validator.py           #   dbt compile/run/test wrapper
 │
-├── cache/                          # Deterministic output caching
-│   └── conversion_cache.py        #   SHA-256 fingerprint → cached LLM output (skip re-generation)
+├── cache/                          # Output caching
+│   └── conversion_cache.py        #   SHA-256 cache layer
 │
-├── discovery/                      # Pre-conversion inventory & schema discovery
-│   ├── xml_inventory.py           #   Recursive XML file scanning with metadata extraction
-│   └── schema_discovery.py        #   3 modes: Snowflake INFORMATION_SCHEMA, XML, manual JSON
+├── discovery/                      # Schema discovery
+│   ├── xml_inventory.py           #   XML file scanning
+│   └── schema_discovery.py        #   3-mode schema discovery
 │
-├── merger/                         # Multi-mapping project assembly
-│   ├── project_merger.py          #   Merge multiple mapping outputs into one dbt project
-│   ├── source_consolidator.py     #   Deduplicate source definitions across mappings
-│   └── conflict_resolver.py       #   Handle naming conflicts between mappings
+├── merger/                         # Project assembly
+│   ├── project_merger.py          #   Merge logic (new + merge modes)
+│   ├── source_consolidator.py     #   Source deduplication
+│   └── conflict_resolver.py       #   Naming conflict resolution
 │
-├── git/                            # Version control integration
-│   └── git_manager.py            #   Git init/branch/commit/push/remote management
+├── git/                            # Version control
+│   └── git_manager.py            #   Git init/commit/push
 │
 ├── deployment/                     # Snowflake deployment
-│   └── deployer.py               #   3 modes: direct (snow dbt deploy), Git-based, TASK scheduling
+│   └── deployer.py               #   3-mode deployment
 │
 ├── reports/                        # Assessment reporting
-│   └── ewi_report.py             #   EWI (Errors/Warnings/Informational) HTML + JSON reports
+│   └── ewi_report.py             #   EWI HTML + JSON reports
 │
-└── persistence/                    # Snowflake I/O (stage read/write, table persistence)
-    └── snowflake_io.py            #   Read XML from stages, write results to tables
+└── persistence/                    # Snowflake I/O
+    └── snowflake_io.py            #   Stage read/write
 ```
 
-### 13.2 Pipeline Flow
-
-See diagram: [06_framework_pipeline.html](diagrams/06_framework_pipeline.html)
-
-The end-to-end pipeline executes in 7 stages:
-
-| Stage | CLI Command | Input | Output |
-|-------|-------------|-------|--------|
-| 1. Discovery | `infa2dbt discover` | XML directory | Inventory + schema metadata |
-| 2. Analysis | `infa2dbt convert` (phase 1) | Parsed XML | Complexity scores, strategies |
-| 3. Conversion | `infa2dbt convert` (phase 2) | Enriched mappings | dbt SQL, YAML, macros |
-| 4. Assembly | `infa2dbt convert --mode merge` | Per-mapping files | Unified dbt project |
-| 5. Validation | `infa2dbt validate` | dbt project | Compile/run/test results |
-| 6. Git Push | `infa2dbt git-push` | Validated project | Git commit + push |
-| 7. Deploy | `infa2dbt deploy` | Local or Git project | Snowflake dbt project object |
-
-### 13.3 CLI Command Reference
-
-See full documentation: [CLI_Reference.md](CLI_Reference.md)
-
-| Command | Description |
-|---------|-------------|
-| `infa2dbt convert` | Convert Informatica XML to dbt (new or merge mode) |
-| `infa2dbt discover` | Inventory XML files and discover source schemas |
-| `infa2dbt cache` | Manage conversion output cache (list, clear, stats) |
-| `infa2dbt validate` | Validate dbt project via compile/run/test |
-| `infa2dbt git-push` | Commit and push to Git repository |
-| `infa2dbt deploy` | Deploy to Snowflake (direct, Git-based, or scheduled) |
-| `infa2dbt version` | Show version information |
-
-### 13.4 Test Coverage
-
-| Test File | Tests | Coverage |
-|-----------|-------|----------|
-| `test_xml_parser.py` | 13 | XML parsing, model extraction |
-| `test_validators.py` | 23 | SQL, YAML, project validation |
-| `test_phase7.py` | 42 | Metrics enrichment, error categorization |
-| `test_merger.py` | 23 | Project merge, source consolidation, conflicts |
-| `test_cache.py` | 23 | Cache keys, store/retrieve, disabled mode |
-| `test_discovery.py` | 17 | XML inventory, schema discovery |
-| `test_dbt_validator.py` | 21 | dbt compile/run/test subprocess |
-| `test_git_manager.py` | 23 | Git init/commit/push/remote |
-| `test_deployer.py` | 23 | Direct/Git/schedule deployment |
-| `test_ewi_report.py` | 21 | EWI classification, HTML/JSON output |
-| `test_merge_pipeline.py` | 121 | Integration: multi-mapping merge pipeline |
-| **Total** | **350** | |
-
 ---
 
-## 14. 30-Minute Demo Plan
-
-### Demo Objective
-Demonstrate the end-to-end Informatica-to-dbt migration framework, showing the conversion process, project structure, Snowflake-native deployment, and live execution.
-
-### Prerequisites
-- Snowsight access to account `EPCKZEL-SQUADRON_US_EAST_1`
-- Browser with HTML rendering (for diagram files)
-- Terminal with `snow` CLI configured
-
-### Demo Script
-
----
-
-#### Segment 1: Context & Architecture (5 minutes)
-
-**Goal:** Set the stage. Explain why the migration was done and what the end state looks like.
-
-1. **Open** [05_before_after_comparison.html](diagrams/05_before_after_comparison.html) in browser
-   - Walk through the "Before" side: Informatica pain points (licensing, no Git, no tests)
-   - Walk through the "After" side: dbt benefits (serverless, tests, lineage)
-
-2. **Open** [01_high_level_architecture.html](diagrams/01_high_level_architecture.html) in browser
-   - Trace the flow: Sources → Conversion Engine → dbt Project → Snowflake → Outputs
-   - Highlight: 9 mappings → 51 models, 32 lookups → var(), 170 tests
-
----
-
-#### Segment 2: dbt Project Walkthrough (7 minutes)
-
-**Goal:** Show the actual code structure and explain the layered design.
-
-3. **Open terminal**, navigate to project:
-   ```bash
-   ls /Users/vicky/informatica-to-dbt/dbt_project/
-   ```
-   - Show `dbt_project.yml` — point out the 32 lookup variables
-   - Show `packages.yml` — dbt_utils dependency
-   - Show `profiles.yml` — Snowflake connection (no password for native)
-
-4. **Show model directories:**
-   ```bash
-   ls models/
-   ```
-   - Explain naming: `m_<INFORMATICA_MAPPING_NAME>`
-   - Each mapping has `staging/`, `intermediate/`, `marts/` subdirectories
-
-5. **Open** [02_data_flow_diagram.html](diagrams/02_data_flow_diagram.html) in browser
-   - Walk through one pipeline (Journals STG) end to end
-   - Show how 5 source tables flow through staging → intermediate → 2 mart tables
-
-6. **Show a sample model** — open `models/m_INCR_DM_DIM_EQUIPMENT/marts/dim_equipment_soft_delete.sql`:
-   - Point out `{{ config(materialized='incremental', unique_key='DIM_EQUIPMENT_ID') }}`
-   - Point out `{{ ref('int_dim_equipment_soft_delete') }}` — model dependency
-   - Point out `{% if is_incremental() %}` — only new records processed
-
----
-
-#### Segment 3: Snowflake-Native Deployment (5 minutes)
-
-**Goal:** Show that the project exists as a first-class Snowflake object.
-
-7. **Open** [04_snowflake_deployment_architecture.html](diagrams/04_snowflake_deployment_architecture.html) in browser
-   - Explain: dbt project is an object inside Snowflake, not running externally
-
-8. **In Snowsight**, navigate to:
-   - **Data** → **Databases** → **TPC_DI_RAW_DATA** → **DBT_INGEST**
-   - Show the **dbt Projects** section → **INFORMATICA_TO_DBT**
-   - Show VERSION$1
-
-9. **Show deployed objects** — click through the schema to show views and tables:
-   - Point out `stg_` views (staging layer)
-   - Point out `int_` views (intermediate layer)
-   - Point out `fct_` and `dim_` tables (marts layer)
-
----
-
-#### Segment 4: Live Execution (8 minutes)
-
-**Goal:** Run the project live from Snowflake and show results.
-
-10. **Run compile from SQL worksheet:**
-    ```sql
-    EXECUTE DBT PROJECT TPC_DI_RAW_DATA.DBT_INGEST.INFORMATICA_TO_DBT ARGS = 'compile';
-    ```
-    - Show output: 51 models, 170 tests, 38 sources found
-
-11. **Run the project:**
-    ```sql
-    EXECUTE DBT PROJECT TPC_DI_RAW_DATA.DBT_INGEST.INFORMATICA_TO_DBT ARGS = 'run';
-    ```
-    - Watch models execute in real-time
-    - Point out the execution order (staging first, then intermediate, then marts)
-    - Show final result: **51/51 PASS**
-
-12. **Query a result table:**
-    ```sql
-    SELECT COUNT(*) FROM TPC_DI_RAW_DATA.DBT_INGEST.fct_zj_journals_staging;
-    SELECT * FROM TPC_DI_RAW_DATA.DBT_INGEST.dim_mtrl_master LIMIT 10;
-    ```
-    - Show actual data flowing through the pipeline
-
-13. **Show the DAG:**
-    - Navigate to the dbt project in Snowsight
-    - Click on the **Lineage / DAG** view
-    - Trace a pipeline from source to final mart table
-
----
-
-#### Segment 5: Testing & Quality (3 minutes)
-
-14. **Run tests:**
-    ```sql
-    EXECUTE DBT PROJECT TPC_DI_RAW_DATA.DBT_INGEST.INFORMATICA_TO_DBT ARGS = 'test';
-    ```
-    - Show 170 tests executing
-    - Explain test types: not_null, unique, accepted_values, relationships
-
----
-
-#### Segment 6: Summary & Q&A (2 minutes)
-
-15. **Open** [03_migration_process_flow.html](diagrams/03_migration_process_flow.html) in browser
-    - Recap the 4-phase methodology
-    - Highlight the results banner: 9 mappings → 51 models, 170 tests, 100% pass rate, 0 errors
-
-16. **Key takeaways:**
-    - Informatica PowerCenter decommissioned — no more licensing cost
-    - All pipelines running natively in Snowflake — no external infrastructure
-    - 170 automated tests ensure data quality with every run
-    - Full DAG lineage visible in Snowsight
-    - SQL-first, Git-friendly, version-controlled codebase
-
-17. **Open for Q&A**
-
----
-
-### Demo Timing Summary
-
-| Segment | Duration | Content |
-|---------|----------|---------|
-| 1. Context & Architecture | 5 min | Before/After diagram, High-level architecture |
-| 2. Project Walkthrough | 7 min | Code structure, data flow diagram, sample model |
-| 3. Snowflake Deployment | 5 min | Deployment architecture, Snowsight navigation |
-| 4. Live Execution | 8 min | Compile, run, query results, DAG viewer |
-| 5. Testing & Quality | 3 min | Run tests, explain test types |
-| 6. Summary & Q&A | 2 min | Process flow recap, key takeaways |
-| **Total** | **30 min** | |
-
----
-
-*Document generated for the Informatica to dbt Migration Framework project.*
-*Deployed to: `TPC_DI_RAW_DATA.DBT_INGEST.INFORMATICA_TO_DBT` (VERSION$1)*
-*Snowflake Account: EPCKZEL-SQUADRON_US_EAST_1*
+*This document describes the technical design of the infa2dbt Generic Migration Framework.*
+*For CLI usage details, see [CLI_Reference.md](CLI_Reference.md).*
+*For setup instructions, see [Production_Runbook.md](Production_Runbook.md).*
+*For implementation plan, see [Framework_Implementation_Plan.md](Framework_Implementation_Plan.md).*

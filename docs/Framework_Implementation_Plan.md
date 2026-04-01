@@ -3,12 +3,11 @@
 
 | Field | Value |
 |-------|-------|
-| **Document Version** | 1.0 |
+| **Document Version** | 2.0 |
 | **Project** | Informatica-to-dbt Generic Migration Framework |
 | **Approach** | LLM-Powered (Snowflake Cortex) — SnowConvert AI-aligned design |
 | **Target Platform** | Snowflake-Native dbt Projects |
-| **Current Status** | POC Complete (9 mappings, 51 models, 170 tests, 51/51 PASS) |
-| **Next Phase** | Generic Framework Build |
+| **Current Status** | Framework Complete — CLI, conversion, validation, deployment, Git integration all operational |
 
 ---
 
@@ -38,9 +37,9 @@ Build a **generic, reusable framework** — similar in workflow to Snowflake's S
 - Pushes the project to Git for version control
 - Enables Snowflake to pull from Git and run the project natively
 - Produces identical output on re-runs (via caching)
-- Works for **any** Informatica ETL workload, not just the 9 sample mappings
+- Works for **any** Informatica ETL workload — not limited to specific mappings
 
-### What Exists Today (POC)
+### Framework Components
 
 | Component | Status | Details |
 |-----------|--------|---------|
@@ -52,15 +51,14 @@ Build a **generic, reusable framework** — similar in workflow to Snowflake's S
 | Quality Scorer | Complete | Scores generated code 0-100 across 5 dimensions |
 | Validators | Complete | 9 SQL checks + YAML structure + project-level ref/DAG validation |
 | Post-Processor | Complete | Cleans Informatica residuals (IIF→IFF, ISNULL, etc.), 15+ pattern replacements |
-| Persistence | Partial | Writes to local filesystem or Snowflake stage |
-| **Project Merger** | **Missing** | Each mapping produces an isolated mini-project; no mechanism to merge |
-| **CLI** | **Missing** | Only `notebook_entry.py` exists; no proper command-line tool |
-| **Git Integration** | **Missing** | Zero Git code; project is not even a Git repository |
-| **Snowflake Git Deploy** | **Missing** | No `CREATE GIT REPOSITORY` or Git-based deployment code |
-| **Output Caching** | **Missing** | LLM calls are non-deterministic; re-runs produce different output |
-| **Source Auto-Discovery** | **Missing** | `source_map.json` and `table_columns.json` manually created |
-| **Live dbt Validation** | **Missing** | No `dbt compile` / `dbt run` integration |
-| **Assessment Reports** | **Missing** | No EWI-style reports |
+| Project Merger | Complete | Consolidates individual mapping outputs into one unified dbt project |
+| CLI | Complete | Full `infa2dbt` CLI with convert, discover, report, validate, deploy, git-push, cache, version |
+| Git Integration | Complete | Built-in init, commit, push via `git-push` command |
+| Snowflake Deploy | Complete | Direct deploy via `snow dbt deploy`, Git-based deploy, scheduled TASK deploy |
+| Output Caching | Complete | SHA-256 cache layer ensures deterministic re-runs |
+| Source Auto-Discovery | Complete | Discovers schemas from Snowflake `INFORMATION_SCHEMA`, XML, or JSON file |
+| Live dbt Validation | Complete | Integrated `dbt compile` / `dbt run` / `dbt test` via `validate` command |
+| Assessment Reports | Complete | EWI HTML + JSON reports via `report` command |
 
 ---
 
@@ -70,10 +68,14 @@ Build a **generic, reusable framework** — similar in workflow to Snowflake's S
 
 #### SnowConvert AI (Rule-Based)
 
-```
-ETL Package Files ──► SnowConvert Engine ──► dbt Projects + Orchestration SQL
- (SSIS .dtsx or       (Deterministic        (One dbt project per Data Flow Task
-  Informatica .xml)    rule-based engine)     + Snowflake TASKs for control flow)
+```mermaid
+flowchart LR
+    A["ETL Package Files\n(SSIS .dtsx or\nInformatica .xml)"] --> B["SnowConvert Engine\n(Deterministic\nrule-based engine)"]
+    B --> C["dbt Projects +\nOrchestration SQL\n(One dbt project per\nData Flow Task +\nSnowflake TASKs)"]
+
+    style A fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style B fill:#F5A623,stroke:#C47D1A,color:#fff
+    style C fill:#7ED321,stroke:#5A9A18,color:#fff
 ```
 
 - **Conversion engine**: Deterministic, rule-based. Hardcoded translation rules for each SSIS/Informatica component type.
@@ -84,62 +86,69 @@ ETL Package Files ──► SnowConvert Engine ──► dbt Projects + Orchestr
 
 #### Our Framework (LLM-Powered)
 
-```
-Informatica XML ──► Parser + Analyzer ──► Cortex LLM ──► Post-Process + Validate ──► Merged dbt Project
-                    (Local Python)         (Snowflake)     (Local Python)              (Local filesystem)
+```mermaid
+flowchart LR
+    A["Informatica XML"] --> B["Parser + Analyzer\n(Local Python)"]
+    B --> C["Cortex LLM\n(Snowflake)"]
+    C --> D["Post-Process +\nValidate\n(Local Python)"]
+    D --> E["Merged dbt Project\n(Local filesystem)"]
+
+    style A fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style B fill:#9B59B6,stroke:#6C3483,color:#fff
+    style C fill:#F5A623,stroke:#C47D1A,color:#fff
+    style D fill:#9B59B6,stroke:#6C3483,color:#fff
+    style E fill:#7ED321,stroke:#5A9A18,color:#fff
 ```
 
-- **Conversion engine**: LLM-powered (Snowflake Cortex). Uses comprehensive 285-line system prompt with 57 conversion rules, few-shot examples, and strategy-specific instructions.
+- **Conversion engine**: LLM-powered (Snowflake Cortex). Uses comprehensive system prompt with conversion rules, few-shot examples, and strategy-specific instructions.
 - **Speed**: Slower (30-60 seconds per mapping) — requires LLM API calls.
 - **Output**: Single consolidated dbt project with all mappings merged. Models nested by mapping directory.
 - **Self-healing**: Validates output, sends errors back to LLM for correction (up to 2 attempts).
-- **Testing**: Auto-generates 170+ data tests (not_null, unique, accepted_values, relationships, accepted_range).
+- **Testing**: Auto-generates data tests (not_null, unique, accepted_values, relationships, accepted_range).
 
 ### 2.2 Feature Parity Matrix
 
-| Feature | SnowConvert AI | Our Framework (Current) | Our Framework (After Plan) |
-|---------|---------------|------------------------|---------------------------|
-| **Input formats** | SSIS `.dtsx` + Informatica `.xml` | Informatica `.xml` | Informatica `.xml` (extensible to SSIS) |
-| **Conversion engine** | Rule-based (deterministic) | LLM-powered (Cortex) | LLM-powered + cache for determinism |
-| **Output: dbt structure** | staging/intermediate/marts | staging/intermediate/marts | staging/intermediate/marts (identical) |
-| **Output: orchestration** | Snowflake TASKs + procedures | Not yet | Snowflake TASKs |
-| **Output: EWI reports** | HTML reports | Not yet | HTML assessment reports |
-| **Auto-generated tests** | None | 170+ tests | 170+ tests |
-| **Self-healing** | None (manual EWI fixes) | LLM correction loop (2 attempts) | LLM correction loop (2 attempts) |
-| **Complexity analysis** | Basic | 11-dimension scoring (0-100) | 11-dimension scoring (0-100) |
-| **Function conversion** | ~15 functions (early) | 60+ functions | 60+ functions |
-| **Transform types** | Limited (Sorter, Seq Gen, SQ) | 30+ types (full registry) | 30+ types (full registry) |
-| **Source discovery** | Requires user DDL scripts | Manual `source_map.json` | Auto from Snowflake or XML |
-| **Project merge** | Separate projects per task | Manual (done by hand) | Automated merger |
-| **CLI tool** | `scai` command-line | Only `notebook_entry.py` | Full `infa2dbt` CLI |
-| **Git integration** | Manual / CI-CD docs | None | Built-in git-push + PR |
-| **Snowflake deploy** | `snow dbt deploy` | `snow dbt deploy` (manual) | `snow dbt deploy` + Git repo deploy |
-| **CI/CD** | GitHub Actions (documented) | None | GitHub Actions (built-in) |
-| **Caching/reproducibility** | Rule-based = deterministic | Non-deterministic | SHA-256 cache layer |
-| **Quality scoring** | None | 5-dimension quality score | 5-dimension quality score |
-| **Naming sanitization** | Lowercase + underscore + prefix | `_sanitize_project_name()` | Enhanced (SnowConvert-aligned rules) |
+| Feature | SnowConvert AI | Our Framework |
+|---------|---------------|---------------|
+| **Input formats** | SSIS `.dtsx` + Informatica `.xml` | Informatica `.xml` (extensible to SSIS) |
+| **Conversion engine** | Rule-based (deterministic) | LLM-powered + cache for determinism |
+| **Output: dbt structure** | staging/intermediate/marts | staging/intermediate/marts (identical) |
+| **Output: orchestration** | Snowflake TASKs + procedures | Snowflake TASKs (via deploy --mode schedule) |
+| **Output: EWI reports** | HTML reports | HTML + JSON assessment reports |
+| **Auto-generated tests** | None | Auto-generated per mapping |
+| **Self-healing** | None (manual EWI fixes) | LLM correction loop (2 attempts) |
+| **Complexity analysis** | Basic | 11-dimension scoring (0-100) |
+| **Function conversion** | ~15 functions (early) | 60+ functions |
+| **Transform types** | Limited (Sorter, Seq Gen, SQ) | 30+ types (full registry) |
+| **Source discovery** | Requires user DDL scripts | Auto from Snowflake, XML, or JSON |
+| **Project merge** | Separate projects per task | Automated merger into single project |
+| **CLI tool** | `scai` command-line | Full `infa2dbt` CLI |
+| **Git integration** | Manual / CI-CD docs | Built-in git-push |
+| **Snowflake deploy** | `snow dbt deploy` | `snow dbt deploy` + Git repo deploy + TASK scheduling |
+| **Caching/reproducibility** | Rule-based = deterministic | SHA-256 cache layer |
+| **Quality scoring** | None | 5-dimension quality score |
 
 ### 2.3 Scoring Comparison
 
-| Dimension | SnowConvert AI | Our Framework (Current) | Our Framework (After Plan) |
-|-----------|:--------------:|:-----------------------:|:--------------------------:|
-| **Flexibility** (handles diverse ETL patterns) | 6/10 | 9/10 | 9/10 |
-| **Determinism** (same input → same output) | 10/10 | 3/10 | 8/10 |
-| **Speed** (time per mapping) | 9/10 | 5/10 | 5/10 |
-| **Output quality** (generated code correctness) | 7/10 | 8/10 | 8/10 |
-| **dbt structure** (best practices compliance) | 9/10 | 9/10 | 9/10 |
-| **Testing** (auto-generated data tests) | 3/10 | 9/10 | 9/10 |
-| **Orchestration** (TASK/schedule generation) | 9/10 | 0/10 | 7/10 |
-| **CI/CD** (Git + deploy automation) | 8/10 | 0/10 | 8/10 |
-| **Self-healing** (auto-fix errors) | 0/10 | 8/10 | 8/10 |
-| **ETL breadth** (SSIS + Informatica + ...) | 8/10 | 6/10 | 6/10 |
-| **Overall** | **~77/100** | **~57/100** | **~85/100** |
+| Dimension | SnowConvert AI | Our Framework |
+|-----------|:--------------:|:-------------:|
+| **Flexibility** (handles diverse ETL patterns) | 6/10 | 9/10 |
+| **Determinism** (same input → same output) | 10/10 | 8/10 |
+| **Speed** (time per mapping) | 9/10 | 5/10 |
+| **Output quality** (generated code correctness) | 7/10 | 8/10 |
+| **dbt structure** (best practices compliance) | 9/10 | 9/10 |
+| **Testing** (auto-generated data tests) | 3/10 | 9/10 |
+| **Orchestration** (TASK/schedule generation) | 9/10 | 7/10 |
+| **CI/CD** (Git + deploy automation) | 8/10 | 8/10 |
+| **Self-healing** (auto-fix errors) | 0/10 | 8/10 |
+| **ETL breadth** (SSIS + Informatica + ...) | 8/10 | 6/10 |
+| **Overall** | **~77/100** | **~85/100** |
 
 ### 2.4 Key Advantages of Our Approach
 
 1. **LLM handles complexity that rules cannot**: Informatica mappings with deeply nested expressions, multiple routers, conditional lookups, and complex SCD patterns. SnowConvert generates EWIs for these; our framework generates working code.
 
-2. **Auto-generated tests**: 170+ tests out of the box. SnowConvert generates zero tests — the user must write them manually.
+2. **Auto-generated tests**: Tests are generated out of the box. SnowConvert generates zero tests — the user must write them manually.
 
 3. **Self-healing**: When the LLM makes a mistake, the framework catches it (via 9 SQL checks, YAML validation, project-level ref checks), sends the errors back to the LLM, and gets a corrected output. SnowConvert has no equivalent.
 
@@ -148,9 +157,9 @@ Informatica XML ──► Parser + Analyzer ──► Cortex LLM ──► Post-
 ### 2.5 Where SnowConvert AI is Better
 
 1. **Speed**: Rule-based conversion is instant. Our LLM calls take 30-60 seconds per mapping.
-2. **Determinism**: Rules always produce the same output. Our framework needs a cache layer.
+2. **Determinism**: Rules always produce the same output. Our framework uses a cache layer to achieve near-determinism.
 3. **ETL breadth**: SnowConvert supports both SSIS and Informatica. We currently only support Informatica.
-4. **Orchestration**: SnowConvert generates complete TASK chains for SSIS control flow. We don't yet generate orchestration SQL.
+4. **Orchestration**: SnowConvert generates complete TASK chains for SSIS control flow.
 
 ---
 
@@ -158,70 +167,100 @@ Informatica XML ──► Parser + Analyzer ──► Cortex LLM ──► Post-
 
 ### 3.1 Local Execution Flow
 
-```
-                        LOCAL MACHINE                              SNOWFLAKE
-                   ┌──────────────────────────┐              ┌──────────────────┐
-                   │                          │              │                  │
- XML files ───────►│  1. Parse XML            │              │                  │
-                   │  2. Check cache           │              │                  │
-                   │  3. Analyze complexity    │              │                  │
-                   │  4. Chunk for LLM         │──LLM call──►│  Cortex LLM      │
-                   │  5. Parse LLM response    │◄──response──│  (claude-4-sonnet)│
-                   │  6. Post-process          │              │                  │
-                   │  7. Validate (SQL/YAML)   │              │                  │
-                   │  8. Self-heal if needed   │──LLM call──►│  Cortex LLM      │
-                   │  9. Score quality         │◄──response──│                  │
-                   │ 10. Cache output          │              │                  │
-                   │ 11. Merge into project    │              │                  │
-                   │ 12. dbt compile           │──SQL────────►│  Compile check   │
-                   │ 13. Write locally         │              │                  │
-                   └──────────┬────────────────┘              └──────────────────┘
-                              │
-                   ┌──────────▼────────────────┐
-                   │  14. Git commit + push     │
-                   └──────────┬────────────────┘
-                              │
-                   ┌──────────▼────────────────┐              ┌──────────────────┐
-                   │  15. Deploy to Snowflake   │─────────────►│  CREATE DBT      │
-                   │  (snow dbt deploy or       │              │  PROJECT FROM    │
-                   │   from Git repository)     │              │  @git_repo/main  │
-                   └───────────────────────────┘              └──────────────────┘
+```mermaid
+flowchart TB
+    subgraph LOCAL["LOCAL MACHINE"]
+        A["XML Files"] --> B["1. Parse XML"]
+        B --> C["2. Check Cache"]
+        C -->|Cache Hit| J["10. Return Cached Output"]
+        C -->|Cache Miss| D["3. Analyze Complexity"]
+        D --> E["4. Chunk for LLM"]
+        E --> F{{"5. LLM Call"}}
+        F --> G["6. Parse LLM Response"]
+        G --> H["7. Post-Process"]
+        H --> I["8. Validate (SQL/YAML)"]
+        I -->|Errors| K{{"9. Self-Heal\n(LLM Call)"}}
+        K --> H
+        I -->|Pass| L["10. Score Quality"]
+        L --> M["11. Cache Output"]
+        M --> N["12. Merge into Project"]
+        N --> O["13. dbt compile"]
+        O --> P["14. Write Locally"]
+        P --> Q["15. Git Commit + Push"]
+        Q --> R["16. Deploy to Snowflake"]
+    end
+
+    subgraph SNOWFLAKE["SNOWFLAKE"]
+        S["Cortex LLM"]
+        T["Compile Check"]
+        U["CREATE DBT PROJECT"]
+    end
+
+    F -.->|"LLM call"| S
+    S -.->|"response"| G
+    K -.->|"LLM call"| S
+    O -.->|"SQL"| T
+    R -.->|"deploy"| U
+
+    style LOCAL fill:#f0f4f8,stroke:#2C5F8A,color:#000
+    style SNOWFLAKE fill:#e8f5e9,stroke:#388E3C,color:#000
+    style A fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style F fill:#F5A623,stroke:#C47D1A,color:#fff
+    style K fill:#F5A623,stroke:#C47D1A,color:#fff
+    style S fill:#F5A623,stroke:#C47D1A,color:#fff
+    style R fill:#7ED321,stroke:#5A9A18,color:#fff
+    style U fill:#7ED321,stroke:#5A9A18,color:#fff
 ```
 
 ### 3.2 Component Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         CLI (cli.py)                                │
-│  infa2dbt convert | discover | validate | deploy | git-push        │
-└────────┬──────────┬──────────┬──────────┬──────────┬───────────────┘
-         │          │          │          │          │
-    ┌────▼────┐ ┌──▼───┐ ┌───▼────┐ ┌───▼───┐ ┌───▼────┐
-    │ XML     │ │Schema│ │ dbt    │ │Deploy │ │ Git    │
-    │ Parser  │ │Disco-│ │Validate│ │(direct│ │Manager │
-    │         │ │very  │ │(compile│ │ + git)│ │(commit,│
-    │         │ │      │ │ + run) │ │       │ │ push)  │
-    └────┬────┘ └──────┘ └───────┘ └───────┘ └────────┘
-         │
-    ┌────▼────────────────────────────────────────────┐
-    │              Orchestrator                        │
-    │  analyze → cache check → chunk → LLM generate   │
-    │  → merge chunks → post-process → validate       │
-    │  → self-heal → score → cache store              │
-    └────────┬────────────────────────────────────────┘
-             │
-    ┌────────▼────────────────────────────────────────┐
-    │            Project Merger                        │
-    │  Consolidate mapping outputs into one project:  │
-    │  - Merge dbt_project.yml vars                   │
-    │  - Consolidate _sources.yml                     │
-    │  - Union packages.yml                           │
-    │  - Copy macros (dedup by hash)                  │
-    │  - Write models/<mapping>/staging|int|marts/    │
-    └─────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    CLI["CLI (cli.py)\ninfa2dbt convert | discover | report |\nvalidate | deploy | git-push"]
+
+    CLI --> PARSER["XML Parser"]
+    CLI --> DISCO["Schema Discovery"]
+    CLI --> REPORT["EWI Report Generator"]
+    CLI --> VALID["dbt Validator\n(compile + run + test)"]
+    CLI --> DEPLOY["Deployer\n(direct + git + schedule)"]
+    CLI --> GIT["Git Manager\n(commit, push)"]
+
+    PARSER --> ORCH["Orchestrator\nanalyze → cache check → chunk →\nLLM generate → merge chunks →\npost-process → validate →\nself-heal → score → cache store"]
+
+    ORCH --> MERGER["Project Merger\nConsolidate mapping outputs into one project:\n- Merge dbt_project.yml vars\n- Consolidate _sources.yml\n- Union packages.yml\n- Copy macros (dedup by hash)\n- Write models/‹mapping›/staging|int|marts/"]
+
+    style CLI fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style PARSER fill:#9B59B6,stroke:#6C3483,color:#fff
+    style DISCO fill:#9B59B6,stroke:#6C3483,color:#fff
+    style REPORT fill:#9B59B6,stroke:#6C3483,color:#fff
+    style VALID fill:#9B59B6,stroke:#6C3483,color:#fff
+    style DEPLOY fill:#7ED321,stroke:#5A9A18,color:#fff
+    style GIT fill:#7ED321,stroke:#5A9A18,color:#fff
+    style ORCH fill:#F5A623,stroke:#C47D1A,color:#fff
+    style MERGER fill:#F5A623,stroke:#C47D1A,color:#fff
 ```
 
-### 3.3 What Runs Where
+### 3.3 Pipeline Execution Order
+
+```mermaid
+flowchart LR
+    A["convert"] --> B["discover"]
+    B --> C["report"]
+    C --> D["validate"]
+    D --> E["deploy"]
+    E --> F["execute\n(snow dbt execute)"]
+    F --> G["git-push"]
+
+    style A fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style B fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style C fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style D fill:#F5A623,stroke:#C47D1A,color:#fff
+    style E fill:#7ED321,stroke:#5A9A18,color:#fff
+    style F fill:#7ED321,stroke:#5A9A18,color:#fff
+    style G fill:#9B59B6,stroke:#6C3483,color:#fff
+```
+
+### 3.4 What Runs Where
 
 | Operation | Where it runs | Requires Snowflake? |
 |-----------|--------------|---------------------|
@@ -235,7 +274,9 @@ Informatica XML ──► Parser + Analyzer ──► Cortex LLM ──► Post-
 | Quality scoring | Local Python | No |
 | Output caching | Local filesystem | No |
 | Project merging | Local Python | No |
-| `dbt compile` validation | Via Snowflake (SQL) | **Yes** |
+| Schema discovery | Snowflake `INFORMATION_SCHEMA` or local XML/JSON | Optional |
+| `dbt compile` / `dbt run` validation | Via Snowflake (SQL) | **Yes** |
+| EWI report generation | Local Python | No |
 | Git operations | Local git CLI | No |
 | Snowflake deployment | Snowflake (snow CLI or SQL) | **Yes** |
 
@@ -275,40 +316,38 @@ Output/ETL/
 
 **Why SnowConvert uses this**: SSIS Data Flow Tasks are inherently isolated — each operates independently. Separate projects make sense.
 
-### 4.2 Our Framework Structure (Recommended — Keep As-Is)
+### 4.2 Our Framework Structure
 
 Our framework creates **one consolidated dbt project** with mappings nested by directory:
 
 ```
 dbt_project/
-├── dbt_project.yml              # Single project config with all vars (32 lookups)
+├── dbt_project.yml              # Single project config with per-mapping model settings
 ├── profiles.yml                 # Snowflake connection
-├── packages.yml                 # dbt_utils v1.3.0
-├── macros/                      # Shared macros
-│   ├── generate_md5_hash.sql
-│   └── hash_md5_50_fields.sql
+├── macros/                      # Shared macros (deduplicated across mappings)
+│   └── *.sql
 ├── models/
-│   ├── m_BL_FF_ZJ_JOURNALS_STG/    # Mapping 1
-│   │   ├── staging/
+│   ├── <mapping_name>/          # One directory per Informatica mapping
+│   │   ├── staging/             # Source views + schema tests
 │   │   │   ├── _sources.yml
 │   │   │   ├── _stg__schema.yml
-│   │   │   └── stg_f0911_jnl_stg.sql, stg_f0901_jnl_stg.sql, ...
-│   │   ├── intermediate/
+│   │   │   └── stg_*.sql
+│   │   ├── intermediate/        # Transformation logic (optional, per complexity)
 │   │   │   ├── _int__schema.yml
-│   │   │   └── int_journals_base.sql, int_journals_reverse.sql, ...
-│   │   └── marts/
+│   │   │   └── int_*.sql
+│   │   └── marts/               # Final business tables (optional, per complexity)
 │   │       ├── _marts__schema.yml
-│   │       └── fct_zj_journals_staging.sql, fct_zj_journals_flat_file.sql
-│   ├── m_INCR_DM_DIM_EQUIPMENT/     # Mapping 2
-│   │   ├── staging/    (8 models)
-│   │   ├── intermediate/ (5 models)
-│   │   └── marts/       (1 model)
-│   ├── m_DI_ITEM_MTRL_MASTER/       # Mapping 3
-│   └── ...                           # N more mappings
+│   │       └── fct_*.sql / dim_*.sql
+│   ├── <mapping_name>/          # Another mapping
+│   │   └── ...
+│   └── ...                      # N more mappings
+├── reports/                     # EWI assessment reports (HTML + JSON)
 ├── seeds/
 ├── snapshots/
 └── tests/
 ```
+
+> **Note:** Not every mapping will have all three layers. Simple mappings (e.g. staging-only) may only generate a `staging/` directory. Complex mappings with multiple transformation steps generate `staging/`, `intermediate/`, and `marts/`.
 
 ### 4.3 Why Our Structure is Better for Informatica
 
@@ -319,23 +358,35 @@ dbt_project/
 | Shared macros | Duplicated per project | One `macros/` directory | **Ours** |
 | Deployment | Deploy N separate dbt projects | Deploy 1 project | **Ours** |
 | Naming collision | No risk (isolated) | Prevented by mapping-name prefix | Tie |
-| Selective execution | Separate project = natural isolation | `dbt run --select tag:<mapping>` | Tie |
+| Selective execution | Separate project = natural isolation | `dbt run --select tag:<mapping_name>` | Tie |
 | Traceability | Mapping → project (clear) | Mapping → directory (equally clear) | Tie |
 
-**Decision**: Keep our current structure. Add dbt `tags` per mapping for selective execution.
+**Decision**: Keep our current structure. dbt `tags` per mapping enable selective execution.
 
-### 4.4 Minor Enhancement: Add Tags
+### 4.4 Tag-Based Selective Execution
 
-Add to each model's config block:
+Each mapping's models are automatically tagged in `dbt_project.yml`:
 
-```sql
-{{ config(materialized='view', tags=['m_BL_FF_ZJ_JOURNALS_STG']) }}
+```yaml
+models:
+  project_name:
+    <mapping_name>:
+      +tags: ['<mapping_name>']
+      staging:
+        +materialized: view
+      intermediate:
+        +materialized: view
+      marts:
+        +materialized: table
 ```
 
-Enables:
-```sql
--- Run only one mapping's models
-EXECUTE DBT PROJECT ... ARGS = 'run --select tag:m_BL_FF_ZJ_JOURNALS_STG';
+This enables running a single mapping:
+```bash
+# Run only one mapping's models
+dbt run --select tag:<mapping_name>
+
+# Or via Snowflake-native execution
+EXECUTE DBT PROJECT DB.SCHEMA.PROJECT ARGS = 'run --select tag:<mapping_name>';
 ```
 
 ---
@@ -344,7 +395,7 @@ EXECUTE DBT PROJECT ... ARGS = 'run --select tag:m_BL_FF_ZJ_JOURNALS_STG';
 
 ### Step 1: CLI Entry Point
 
-**What**: Create a `click`-based CLI that mirrors SnowConvert AI's project workflow.
+**What**: A `click`-based CLI that mirrors SnowConvert AI's project workflow.
 
 **Commands**:
 
@@ -364,12 +415,16 @@ infa2dbt convert \
 
 # Discover source tables from Snowflake
 infa2dbt discover \
-  --database TPC_DI_RAW_DATA \
-  --schema MOCK_SOURCES \
-  --connection myconnection
+  --input ./informatica_xmls/ \
+  --schema-source snowflake \
+  --database MY_DB \
+  --schema MY_SCHEMA
+
+# Generate EWI assessment report
+infa2dbt report --project-dir ./my_dbt_project/ --format both
 
 # Validate the generated project locally
-infa2dbt validate --project ./my_dbt_project/
+infa2dbt validate --project ./my_dbt_project/ --run-tests
 
 # Deploy to Snowflake
 infa2dbt deploy \
@@ -380,22 +435,24 @@ infa2dbt deploy \
 # Push to Git
 infa2dbt git-push \
   --project ./my_dbt_project/ \
-  --remote origin --branch main
+  --remote-url https://github.com/org/repo.git --branch main
 
-# Show conversion history
-infa2dbt status --project ./my_dbt_project/
+# Cache management
+infa2dbt cache list
+infa2dbt cache stats
+infa2dbt cache clear --yes
 ```
 
-**New file**: `informatica_to_dbt/cli.py`
-**Modify**: `pyproject.toml` — add `click` dependency, `[project.scripts] infa2dbt = "informatica_to_dbt.cli:main"`
+**File**: `informatica_to_dbt/cli.py`
+**Config**: `pyproject.toml` — `click` dependency, `[project.scripts] infa2dbt = "informatica_to_dbt.cli:main"`
 
 ---
 
 ### Step 2: Project Merger
 
-**What**: The critical missing piece. Assembles individual mapping outputs into one consolidated dbt project.
+**What**: Assembles individual mapping outputs into one consolidated dbt project.
 
-**New files**:
+**Files**:
 - `informatica_to_dbt/merger/project_merger.py` — Core merge logic
 - `informatica_to_dbt/merger/source_consolidator.py` — Deduplicate `_sources.yml`
 - `informatica_to_dbt/merger/conflict_resolver.py` — Handle naming conflicts
@@ -420,7 +477,7 @@ infa2dbt status --project ./my_dbt_project/
    {
      "version": "1.0.0",
      "mappings": {
-       "m_BL_FF_ZJ_JOURNALS_STG": {
+       "<mapping_name>": {
          "xml_hash": "sha256:abc...",
          "converted_at": "2026-03-31T10:00:00Z",
          "files_generated": 10,
@@ -436,7 +493,7 @@ infa2dbt status --project ./my_dbt_project/
 
 **What**: Ensures same XML input produces same dbt output (solves LLM non-determinism).
 
-**New file**: `informatica_to_dbt/cache/conversion_cache.py`
+**File**: `informatica_to_dbt/cache/conversion_cache.py`
 
 **Logic**:
 - **Cache key** = SHA-256 of: `XML content + converter_version + prompt_version + LLM model name`
@@ -454,7 +511,7 @@ infa2dbt status --project ./my_dbt_project/
 ├── a1b2c3d4.../         # SHA-256 prefix
 │   ├── metadata.json    # XML filename, timestamp, quality score
 │   └── files/           # Cached GeneratedFile objects
-│       ├── models/staging/stg_f0911.sql
+│       ├── models/staging/stg_example.sql
 │       ├── models/staging/_sources.yml
 │       └── ...
 ```
@@ -465,36 +522,37 @@ infa2dbt status --project ./my_dbt_project/
 
 **What**: Eliminate the manual `source_map.json` / `table_columns.json` dependency.
 
-**New file**: `informatica_to_dbt/discovery/schema_discovery.py`
+**File**: `informatica_to_dbt/discovery/schema_discovery.py`
 
 **Three modes**:
 
-1. **Snowflake mode** (`infa2dbt discover --database DB --schema SCHEMA`):
+1. **Snowflake mode** (`infa2dbt discover --schema-source snowflake --database DB --schema SCHEMA`):
    - Query `INFORMATION_SCHEMA.COLUMNS` → build table→column map
    - Output: `source_map.json` auto-generated
 
-2. **XML mode** (automatic during conversion):
+2. **XML mode** (`infa2dbt discover --schema-source xml`):
    - Extract source/target tables and columns from Informatica XML
    - The parser already captures `Source.fields` and `Target.fields`
    - No Snowflake connection needed
 
-3. **Manual mode** (fallback):
-   - User provides `source_map.json` via `--source-map` flag
-   - Backwards compatible with current workflow
+3. **JSON mode** (`infa2dbt discover --schema-source json --json-path ./source_map.json`):
+   - User provides pre-built `source_map.json`
+   - Backwards compatible with manual workflow
 
 ---
 
 ### Step 5: Live dbt Validation
 
-**What**: Integrate `dbt compile` and `dbt run` into the pipeline for real validation.
+**What**: Integrate `dbt compile`, `dbt run`, and `dbt test` into the pipeline for real validation.
 
-**New file**: `informatica_to_dbt/validation/dbt_validator.py`
+**File**: `informatica_to_dbt/validation/dbt_validator.py`
 
 **Logic**:
 - After merger writes the project, run `dbt compile` via subprocess
 - Parse stdout/stderr for errors → classify as EWIs
 - Optionally run `dbt run` for full execution validation
-- Generate **assessment report** (HTML) with:
+- Optionally run `dbt test` for data quality verification
+- Generate **assessment report** (HTML + JSON) with:
   - Per-mapping: complexity score, strategy, files generated, EWIs
   - Aggregate: total models, tests, pass rate, quality scores
   - Similar to SnowConvert's ETL Replatform Component Summary Report
@@ -505,66 +563,51 @@ infa2dbt status --project ./my_dbt_project/
 
 **What**: Built-in Git support for version control workflow.
 
-**New file**: `informatica_to_dbt/git/git_manager.py`
+**File**: `informatica_to_dbt/git/git_manager.py`
 
 **Operations**:
 - `init_repo(path)` — `git init` if not already a repo
 - `create_branch(name)` — create feature branch from current HEAD
 - `commit(message)` — stage dbt project files, commit with descriptive message
 - `push(remote, branch)` — push to GitHub/GitLab/Azure DevOps
-- `create_pr(title, body)` — create pull request via `gh` CLI (if available)
-
-**CLI integration**: One command does convert + merge + git push:
-```bash
-infa2dbt convert \
-  --input ./new_workflows/ \
-  --output ./my_dbt_project/ \
-  --mode merge \
-  --git-push \
-  --branch feature/new-journals-mapping
-```
 
 ---
 
 ### Step 7: Snowflake Deployment
 
-**What**: Deploy the dbt project to Snowflake (direct or via Git).
+**What**: Deploy the dbt project to Snowflake (direct, via Git, or scheduled).
 
-**New file**: `informatica_to_dbt/deployment/deployer.py`
+**File**: `informatica_to_dbt/deployment/deployer.py`
 
 **Three deployment modes**:
 
-1. **Direct mode** (existing — uses `snow dbt deploy`):
+1. **Direct mode** (uses `snow dbt deploy`):
    ```bash
-   infa2dbt deploy --project ./my_dbt_project/ --database DB --schema SCHEMA
-   # Runs: snow dbt deploy --source ./my_dbt_project/ --database DB --schema SCHEMA PROJECT_NAME
+   infa2dbt deploy --project ./my_dbt_project/ --database DB --schema SCHEMA --mode direct
    ```
 
-2. **Git mode** (new — Snowflake pulls from Git):
+2. **Git mode** (Snowflake pulls from Git):
    ```bash
-   infa2dbt deploy --from-git --git-repo my_git_repo --branch main
+   infa2dbt deploy --project ./my_dbt_project/ --mode git \
+       --git-url https://github.com/org/repo.git --git-repo-name my_git_repo
    ```
    Generates and executes:
    ```sql
-   -- One-time setup
    CREATE OR REPLACE API INTEGRATION git_api_integration ...;
-   CREATE OR REPLACE SECRET git_secret ...;
    CREATE OR REPLACE GIT REPOSITORY my_git_repo ...;
-
-   -- Deploy from Git
    ALTER GIT REPOSITORY my_git_repo FETCH;
    CREATE OR REPLACE DBT PROJECT my_project
      FROM '@my_git_repo/branches/main/dbt_project';
    ```
 
-3. **Schedule mode** (new — TASK-based orchestration):
+3. **Schedule mode** (TASK-based orchestration):
    ```bash
-   infa2dbt deploy ... --schedule "0 2 * * *"
+   infa2dbt deploy --project ./my_dbt_project/ --mode schedule --cron "0 2 * * *"
    ```
    Generates:
    ```sql
    CREATE OR REPLACE TASK dbt_nightly_run
-     WAREHOUSE = SMALL_WH
+     WAREHOUSE = MY_WH
      SCHEDULE = 'USING CRON 0 2 * * * America/New_York'
    AS
      EXECUTE DBT PROJECT DB.SCHEMA.PROJECT_NAME ARGS = 'run';
@@ -572,63 +615,51 @@ infa2dbt convert \
 
 ---
 
-### Step 8: Generic Documentation & Reports
+### Step 8: Assessment Reports
 
-**What**: Update all documentation to be framework-level (not 9-XML specific).
+**What**: Generate EWI-style assessment reports for conversion transparency.
 
-**Changes**:
-- Rewrite `docs/Technical_Design_Document.md` → generic framework doc with CLI reference
-- Add `docs/diagrams/06_framework_pipeline.html` → full pipeline diagram including Git/deploy
-- Update `docs/diagrams/01_high_level_architecture.html` → add Git integration layer
-- Add `docs/CLI_Reference.md` → full CLI command reference
-- Generate **per-run HTML assessment reports** (SnowConvert-style)
+**File**: `informatica_to_dbt/reports/ewi_report.py`
+
+**Output**: HTML and/or JSON reports in the project's `reports/` directory, containing:
+- Conversion summary (total mappings, models, tests)
+- Per-mapping breakdown (complexity score, strategy, EWIs)
+- Quality scores and pass rates
 
 ---
 
 ## 6. File Inventory
 
-### 6.1 New Files to Create
+### 6.1 Framework Files
 
 | File | Purpose |
 |------|---------|
 | `informatica_to_dbt/cli.py` | Click-based CLI (primary user interface) |
-| `informatica_to_dbt/merger/__init__.py` | Merger module init |
 | `informatica_to_dbt/merger/project_merger.py` | Core merge logic (new project + merge into existing) |
-| `informatica_to_dbt/merger/source_consolidator.py` | Deduplicate `_sources.yml` across mappings |
+| `informatica_to_dbt/merger/source_consolidator.py` | Deduplicate `_sources.yml` |
 | `informatica_to_dbt/merger/conflict_resolver.py` | Handle naming conflicts |
-| `informatica_to_dbt/cache/__init__.py` | Cache module init |
-| `informatica_to_dbt/cache/conversion_cache.py` | SHA-256 fingerprint + cache lookup/store |
-| `informatica_to_dbt/discovery/__init__.py` | Discovery module init |
-| `informatica_to_dbt/discovery/schema_discovery.py` | Auto-discover source schema from Snowflake or XML |
-| `informatica_to_dbt/git/__init__.py` | Git module init |
-| `informatica_to_dbt/git/git_manager.py` | Git init/branch/commit/push/PR operations |
-| `informatica_to_dbt/deployment/__init__.py` | Deployment module init |
+| `informatica_to_dbt/cache/conversion_cache.py` | SHA-256 output cache |
+| `informatica_to_dbt/discovery/schema_discovery.py` | Auto-discover source schema from Snowflake, XML, or JSON |
+| `informatica_to_dbt/git/git_manager.py` | Git init/branch/commit/push operations |
 | `informatica_to_dbt/deployment/deployer.py` | Snowflake deploy (direct + Git + TASK scheduling) |
-| `informatica_to_dbt/validation/__init__.py` | Validation module init |
-| `informatica_to_dbt/validation/dbt_validator.py` | Live `dbt compile`/`dbt run` validation |
-| `informatica_to_dbt/reports/__init__.py` | Reports module init |
-| `informatica_to_dbt/reports/ewi_report.py` | HTML assessment report generator |
-| `tests/unit/test_merger.py` | Merger unit tests |
-| `tests/unit/test_cache.py` | Cache unit tests |
-| `tests/unit/test_discovery.py` | Discovery unit tests |
-| `tests/unit/test_git_manager.py` | Git integration tests |
-| `tests/integration/test_end_to_end_framework.py` | Full pipeline integration test |
-| `.gitignore` | Git ignore rules |
-| `docs/Framework_Implementation_Plan.md` | This document |
-| `docs/CLI_Reference.md` | CLI command reference |
-| `docs/diagrams/06_framework_pipeline.html` | Full pipeline diagram |
+| `informatica_to_dbt/validation/dbt_validator.py` | Live `dbt compile`/`dbt run`/`dbt test` validation |
+| `informatica_to_dbt/reports/ewi_report.py` | HTML + JSON assessment report generator |
 
-### 6.2 Existing Files to Modify
+### 6.2 Configuration Files
 
-| File | Changes |
+| File | Purpose |
 |------|---------|
-| `pyproject.toml` | Add `click` dependency, `[project.scripts]` entry point |
-| `informatica_to_dbt/config.py` | Add fields: `project_dir`, `git_remote`, `git_branch`, `cache_dir`, `cache_enabled`, `converter_version`, `connection_name` |
-| `informatica_to_dbt/orchestrator.py` | Add post-conversion hooks for merger + cache integration |
-| `informatica_to_dbt/generator/prompt_builder.py` | Add `PROMPT_VERSION` constant for cache keying |
-| `informatica_to_dbt/__init__.py` | Export new modules |
-| `docs/Technical_Design_Document.md` | Rewrite as generic framework documentation |
-| `docs/diagrams/01_high_level_architecture.html` | Add Git/CI-CD layer |
+| `pyproject.toml` | Project metadata, dependencies (`lxml`, `networkx`, `sqlparse`, `jinja2`, `pyyaml`, `click`), entry point |
+| `informatica_to_dbt/config.py` | Runtime configuration: `project_dir`, `git_remote`, `git_branch`, `cache_dir`, `cache_enabled`, `connection_name` |
+
+### 6.3 Documentation
+
+| File | Purpose |
+|------|---------|
+| `docs/Framework_Implementation_Plan.md` | This document — architecture, design decisions, implementation steps |
+| `docs/CLI_Reference.md` | Full CLI command reference with all flags and examples |
+| `docs/Production_Runbook.md` | Setup guide for running the framework on a new machine |
+| `docs/Technical_Design_Document.md` | Technical deep-dive into parser, LLM generator, validators |
 
 ---
 
@@ -639,39 +670,46 @@ infa2dbt convert \
 | Step | Verification | Command |
 |------|-------------|---------|
 | 1. CLI | Smoke test all commands | `infa2dbt --help`, `infa2dbt convert --help` |
-| 2. Merger | Convert 2 XMLs → merge → valid project | `infa2dbt convert --input ./input/wf_AM_DI_CUSTOMER.XML --output /tmp/test --mode new` then `infa2dbt convert --input ./input/wf_AP_FF_CITIBANK_VCA.XML --output /tmp/test --mode merge` |
+| 2. Merger | Convert multiple XMLs → merge → valid project | `infa2dbt convert -i ./input/ -o /tmp/test -m new` |
 | 3. Cache | Convert same XML twice → second returns instantly | Time both runs; second should skip LLM calls |
-| 4. Discovery | Auto-discover from Snowflake | `infa2dbt discover --database TPC_DI_RAW_DATA --schema MOCK_SOURCES` |
-| 5. Validation | `dbt compile` succeeds on merged project | `infa2dbt validate --project /tmp/test` |
-| 6. Git | Commit + push works | `infa2dbt git-push --project /tmp/test --branch test-branch` |
-| 7. Deploy | Native project works | `infa2dbt deploy --project /tmp/test --database TPC_DI_RAW_DATA --schema DBT_INGEST` |
-| 8. Docs | All documentation is generic | Manual review |
+| 4. Discovery | Auto-discover from Snowflake | `infa2dbt discover -i ./input/ --schema-source snowflake --database DB --schema SCHEMA` |
+| 5. Validation | `dbt compile` + `dbt run` + `dbt test` succeed | `infa2dbt validate -p /tmp/test --run-tests` |
+| 6. Git | Commit + push works | `infa2dbt git-push -p /tmp/test --remote-url <url> -b main` |
+| 7. Deploy | Native project works | `infa2dbt deploy -p /tmp/test -d DB -s SCHEMA --connection conn` |
+| 8. Reports | EWI report generated | `infa2dbt report -p /tmp/test -f both` |
 
 ### 7.2 End-to-End Verification
 
 ```bash
-# 1. Convert all 9 XMLs into a new project
-infa2dbt convert --input ./input/ --output /tmp/full_test --mode new --connection myconnection
+# 1. Convert all XMLs into a new project
+infa2dbt convert -i ./input/ -o ./output/dbt_project -m new \
+    --connection myconnection --source-schema MY_SCHEMA
 
-# 2. Validate locally
-infa2dbt validate --project /tmp/full_test
+# 2. Discover schemas
+infa2dbt discover -i ./input/ --schema-source snowflake \
+    --database MY_DB --schema MY_SCHEMA
 
-# 3. Re-run (should use cache — no LLM calls)
-infa2dbt convert --input ./input/ --output /tmp/full_test --mode new --connection myconnection
+# 3. Generate assessment report
+infa2dbt report -p ./output/dbt_project -f both
 
-# 4. Git push
-infa2dbt git-push --project /tmp/full_test --branch feature/full-migration
+# 4. Validate (compile + run + test)
+infa2dbt validate -p ./output/dbt_project --run-tests
 
-# 5. Deploy to Snowflake
-infa2dbt deploy --project /tmp/full_test --database TPC_DI_RAW_DATA --schema DBT_INGEST --connection myconnection
+# 5. Re-run convert (should use cache — no LLM calls)
+infa2dbt convert -i ./input/ -o ./output/dbt_project -m new \
+    --connection myconnection --source-schema MY_SCHEMA
 
-# 6. Execute in Snowflake
-EXECUTE DBT PROJECT TPC_DI_RAW_DATA.DBT_INGEST.INFORMATICA_TO_DBT ARGS = 'run';
--- Expected: 51/51 PASS
+# 6. Deploy to Snowflake
+infa2dbt deploy -p ./output/dbt_project -d MY_DB -s MY_SCHEMA \
+    -n MY_PROJECT --connection myconnection --mode direct
 
-# 7. Run tests
-EXECUTE DBT PROJECT TPC_DI_RAW_DATA.DBT_INGEST.INFORMATICA_TO_DBT ARGS = 'test';
--- Expected: 170 tests pass
+# 7. Execute in Snowflake
+snow dbt execute -c myconnection --database MY_DB --schema MY_SCHEMA MY_PROJECT run
+snow dbt execute -c myconnection --database MY_DB --schema MY_SCHEMA MY_PROJECT test
+
+# 8. Push to Git
+infa2dbt git-push -p ./output/dbt_project \
+    --remote-url https://github.com/org/repo.git -b main
 ```
 
 ### 7.3 Unit Test Verification
@@ -680,7 +718,7 @@ EXECUTE DBT PROJECT TPC_DI_RAW_DATA.DBT_INGEST.INFORMATICA_TO_DBT ARGS = 'test';
 # All existing tests must continue to pass
 pytest tests/ -v
 
-# New tests
+# Module-specific tests
 pytest tests/unit/test_merger.py -v
 pytest tests/unit/test_cache.py -v
 pytest tests/unit/test_discovery.py -v
@@ -707,7 +745,7 @@ pytest tests/integration/test_end_to_end_framework.py -v
 | 1.7 | Integrate merger into `orchestrator.py` | 1.4, 1.5, 1.6 |
 | 1.8 | Wire CLI `convert` command to orchestrator + merger | 1.3, 1.7 |
 | 1.9 | Write `tests/unit/test_merger.py` | 1.4 |
-| 1.10 | Test: convert 2 XMLs → merge → valid project | 1.8 |
+| 1.10 | Test: convert multiple XMLs → merge → valid project | 1.8 |
 
 ### Phase 2: Reliability (Steps 3-4)
 
@@ -738,20 +776,18 @@ pytest tests/integration/test_end_to_end_framework.py -v
 | 3.7 | Write `tests/unit/test_git_manager.py` | 3.3 |
 | 3.8 | End-to-end test: XML → convert → merge → validate → git push → deploy | All above |
 
-### Phase 4: Documentation & Reports (Step 8)
+### Phase 4: Reports & Documentation (Step 8)
 
-**Priority**: Medium — polish for customer delivery.
+**Priority**: Medium — polish for delivery.
 
 | Order | Task | Dependencies |
 |-------|------|-------------|
-| 4.1 | Create `reports/ewi_report.py` (HTML assessment report) | Phase 1 |
-| 4.2 | Create `docs/diagrams/06_framework_pipeline.html` | None |
-| 4.3 | Update `docs/Technical_Design_Document.md` → generic | None |
-| 4.4 | Create `docs/CLI_Reference.md` | Phase 1 |
-| 4.5 | Update `docs/diagrams/01_high_level_architecture.html` | None |
+| 4.1 | Create `reports/ewi_report.py` (HTML + JSON assessment report) | Phase 1 |
+| 4.2 | Wire `infa2dbt report` CLI command | 4.1 |
+| 4.3 | Update all documentation to be generic (not tied to specific mappings) | None |
+| 4.4 | Create `docs/CLI_Reference.md` — full CLI command reference | Phase 1 |
+| 4.5 | Create `docs/Production_Runbook.md` — setup guide | None |
 
 ---
 
 *This document serves as the complete implementation plan for the Generic Informatica-to-dbt Migration Framework.*
-*Framework repository: `/Users/vicky/informatica-to-dbt/`*
-*Current POC: 9 mappings, 51 models, 170 tests, 51/51 PASS on Snowflake*
