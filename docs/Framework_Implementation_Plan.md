@@ -5,7 +5,7 @@
 |-------|-------|
 | **Document Version** | 2.0 |
 | **Project** | Informatica-to-dbt Generic Migration Framework |
-| **Approach** | LLM-Powered (Snowflake Cortex) — SnowConvert AI-aligned design |
+| **Approach** | LLM-Powered (Snowflake Cortex)  |
 | **Target Platform** | Snowflake-Native dbt Projects |
 | **Current Status** | Framework Complete — CLI, conversion, validation, deployment, Git integration all operational |
 
