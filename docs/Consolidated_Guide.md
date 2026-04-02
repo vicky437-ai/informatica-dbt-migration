@@ -3,10 +3,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Duration** | 30 Minutes |
-| **Audience** | Customer Technical & Business Stakeholders |
-| **Prerequisites** | Customer is aware of the initial notebook-based prototype approach |
-| **Demo Focus** | Industrialized framework — generic, reusable, production-grade |
+| **Topic Focus** | Industrialized framework — generic, reusable, production-grade |
 | **Key Message** | From prototype to production: a standardized, LLM-powered migration framework that converts any Informatica PowerCenter mapping to Snowflake-native dbt |
 
 ---
