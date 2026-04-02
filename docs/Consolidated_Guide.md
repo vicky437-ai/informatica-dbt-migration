@@ -1,5 +1,5 @@
 # Consolidated Guide — infa2dbt Framework
-## 30-Minute Live Walkthrough
+
 
 | Field | Value |
 |-------|-------|
