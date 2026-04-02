@@ -889,7 +889,27 @@ Step 7 - Push to Git: Commit and push to GitHub
 
 Execute each step and show the output summary after each one.
 ```
+```
+  Running via Cortex Code (Coco) vs Standalone
 
+  There is no functional difference in the CLI itself. But running through Coco gives you:
+
+  ┌─────────────────────┬─────────────────────────────────────────────────────────────────────────────────┬────────────────────────────────┐
+  │ Benefit             │ Coco                                                                            │ Standalone Terminal            │
+  ├─────────────────────┼─────────────────────────────────────────────────────────────────────────────────┼────────────────────────────────┤
+  │ See output inline   │ CLI output appears in conversation, you can ask follow-up questions             │ Separate terminal window       │
+  ├─────────────────────┼─────────────────────────────────────────────────────────────────────────────────┼────────────────────────────────┤
+  │ Error diagnosis     │ If a command fails, Coco can read the error and suggest fixes immediately       │ You copy-paste errors manually │
+  ├─────────────────────┼─────────────────────────────────────────────────────────────────────────────────┼────────────────────────────────┤
+  │ Multi-step pipeline │ Coco can chain all 7 pipeline steps sequentially, handling errors between steps │ You run each command manually  │
+  ├─────────────────────┼─────────────────────────────────────────────────────────────────────────────────┼────────────────────────────────┤
+  │ File inspection     │ Coco can read generated dbt models, check for issues, and fix them              │ You open files in an editor    │
+  ├─────────────────────┼─────────────────────────────────────────────────────────────────────────────────┼────────────────────────────────┤
+  │ Deploy + execute    │ Coco can run snow dbt deploy and snow dbt execute and verify results            │ You run them yourself          │
+  ├─────────────────────┼─────────────────────────────────────────────────────────────────────────────────┼────────────────────────────────┤
+  │ Documentation       │ Coco knows the exact flags from --help and can construct commands for you       │ You reference docs             │
+  └─────────────────────┴─────────────────────────────────────────────────────────────────────────────────┴────────────────────────────────┘
+  ```
 ### 7.2 What Each Step Does
 
 | Step | Command | What Happens | Duration |
