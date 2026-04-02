@@ -835,7 +835,7 @@ The complexity analyzer evaluates each mapping across 11 dimensions and selects 
 
 ---
 
-## 7. Run It Yourself — Cortex Code Prompt (3 min)
+## 7. Run It Yourself — Cortex Code Prompt
 
 > **Notes**: This is the automation story. Instead of manually running 7 CLI commands, you paste one prompt into Cortex Code (Coco) and it executes the entire pipeline end-to-end, showing output at each step. This is how we ran the pipeline for this demo.
 
