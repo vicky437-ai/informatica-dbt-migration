@@ -310,7 +310,7 @@ flowchart LR
 
 ## 3. SnowConvert AI vs infa2dbt
 
-> **Notes**: This section is critical. The customer may ask "Why not just use SnowConvert?" Show them the architectural difference, then the feature gap, then the scoring. Be honest about where SnowConvert is better (speed, determinism) — credibility matters.
+> **Notes**: This section is critical. The customer may ask "Why not just use SnowConvert?" Show them the architectural difference, then the feature gap, then the scoring. Be honest about where SnowConvert is better (speed, determinism) .
 
 ### 3.1 Architecture — Rule-Based vs LLM-Powered
 
