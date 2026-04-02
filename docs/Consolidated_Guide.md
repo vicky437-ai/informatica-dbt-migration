@@ -850,9 +850,9 @@ python -m informatica_to_dbt.cli.
 
 Please run the full migration pipeline for these 3 Informatica XMLs
 in /Users/vicky/informatica-to-dbt/test_input/:
-1. wf_AM_DI_CUSTOMER.XML (simple staging)
-2. wf_AP_FF_CITIBANK_VCA.XML (moderate - expression transforms)
-3. s_m_INCR_DM_DIM_EQUIPMENT.XML (complex - 17 sources, lookups)
+1. wf_AM_DI_CUSTOMER.XML
+2. wf_AP_FF_CITIBANK_VCA.XML
+3. s_m_INCR_DM_DIM_EQUIPMENT.XML
 
 Execute these framework CLI steps in order:
 
