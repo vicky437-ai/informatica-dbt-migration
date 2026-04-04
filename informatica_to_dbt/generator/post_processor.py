@@ -128,10 +128,13 @@ def _check_hardcoded_references(sql: str) -> List[str]:
 _INFORMATICA_FN = {
     # Conditional
     "IIF(":             "IFF(",
-    # Null handling — ISNULL(x) in Informatica is a boolean test
-    "ISNULL(":          "IS_NULL_VALUE(",
-    # String
-    "REPLACESTR(":      "REPLACE(",
+    # Null handling — ISNULL(x, default) two-arg form → IFNULL
+    # (single-arg boolean form handled by regex below)
+    "ISNULL(":          "IFNULL(",
+    # NVL is Informatica's null-coalesce — maps to COALESCE in Snowflake
+    "NVL(":             "COALESCE(",
+    # String — REPLACESTR case_flag stripped via pre-pass regex below
+    # "REPLACESTR(":      "REPLACE(",  -- handled by regex to strip case_flag
     "REPLACECHR(":      "TRANSLATE(",
     "REG_EXTRACT(":     "REGEXP_SUBSTR(",
     "REG_REPLACE(":     "REGEXP_REPLACE(",
@@ -184,13 +187,82 @@ _INFORMATICA_REGEX_REPLACEMENTS: List[Tuple[re.Pattern, str, str]] = [
         r"{{ var('\1') }}",
         "$PM parameter",
     ),
-    # DECODE(TRUE, cond1, val1, ...) — should be CASE WHEN
-    (
-        re.compile(r"\bDECODE\s*\(\s*TRUE\s*,", re.IGNORECASE),
-        r"CASE WHEN /* TODO: convert DECODE(TRUE,...) to CASE WHEN */",
-        "DECODE(TRUE,...)",
-    ),
+    # DECODE(TRUE,...) handled by _convert_decode_true() in pre-pass
 ]
+
+
+def _split_decode_args(sql: str, start: int) -> Tuple[List[str], int]:
+    """Extract comma-separated arguments from a DECODE call, respecting nesting.
+
+    *start* should point to the opening ``(`` after ``DECODE``.
+    Returns a tuple of (list-of-argument-strings, end-index-after-closing-paren).
+    If the closing paren is not found the original text is left unchanged by
+    returning an empty list.
+    """
+    depth = 0
+    args: List[str] = []
+    buf: List[str] = []
+    i = start
+    while i < len(sql):
+        ch = sql[i]
+        if ch == "(":
+            depth += 1
+            if depth == 1:
+                # skip the opening paren itself
+                i += 1
+                continue
+            buf.append(ch)
+        elif ch == ")":
+            if depth == 1:
+                # closing paren of DECODE
+                args.append("".join(buf).strip())
+                return args, i + 1
+            depth -= 1
+            buf.append(ch)
+        elif ch == "," and depth == 1:
+            args.append("".join(buf).strip())
+            buf = []
+        else:
+            buf.append(ch)
+        i += 1
+    # Unbalanced — return empty to signal failure
+    return [], start
+
+
+_DECODE_TRUE_RE = re.compile(r"\bDECODE\s*\(\s*TRUE\s*,", re.IGNORECASE)
+
+
+def _convert_decode_true(sql: str) -> str:
+    """Convert ``DECODE(TRUE, cond1, val1, ..., default)`` to CASE WHEN.
+
+    Handles nested function calls in arguments by tracking parenthesis depth.
+    Falls back to a TODO comment if parsing fails.
+    """
+    while True:
+        m = _DECODE_TRUE_RE.search(sql)
+        if not m:
+            break
+        # Find the opening paren of DECODE(
+        paren_pos = sql.index("(", m.start())
+        args, end_pos = _split_decode_args(sql, paren_pos)
+        if not args:
+            # Parsing failed — leave a TODO marker and break to avoid infinite loop
+            sql = sql[:m.start()] + "CASE WHEN /* TODO: DECODE(TRUE,...) parse error */" + sql[m.end():]
+            break
+        # First arg is TRUE itself (from DECODE(TRUE, ...)).
+        # Skip it — the condition/value pairs start at args[1].
+        parts = args[1:]
+        case_parts: List[str] = []
+        i = 0
+        while i + 1 < len(parts):
+            case_parts.append(f"WHEN {parts[i]} THEN {parts[i + 1]}")
+            i += 2
+        # Odd trailing argument is the ELSE default
+        if i < len(parts):
+            case_parts.append(f"ELSE {parts[i]}")
+        case_expr = "CASE " + " ".join(case_parts) + " END"
+        sql = sql[:m.start()] + case_expr + sql[end_pos:]
+    return sql
 
 
 def _fix_informatica_residuals(sql: str) -> str:
@@ -200,6 +272,45 @@ def _fix_informatica_residuals(sql: str) -> str:
     corrupting column names (e.g. ``IS_NULL_FLAG`` must not be touched
     when replacing ``ISNULL(``).
     """
+    # Pre-pass: convert single-arg ISNULL(expr) boolean form → (expr IS NULL).
+    # This must run BEFORE the simple-text loop which converts ISNULL( → IFNULL(.
+    # Only matches when there is no comma inside (i.e. single argument).
+    sql = re.sub(
+        r"\bISNULL\s*\(\s*([^,()]+?)\s*\)",
+        r"(\1 IS NULL)",
+        sql,
+        flags=re.IGNORECASE,
+    )
+
+    # Pre-pass: NVL2(expr, not_null_val, null_val) → IFF(expr IS NOT NULL, ..., ...)
+    # Must run BEFORE simple-text loop which maps NVL( → COALESCE( (would match NVL2 prefix).
+    sql = re.sub(
+        r"\bNVL2\s*\(\s*([^,()]+?)\s*,\s*([^,()]+?)\s*,\s*([^,()]+?)\s*\)",
+        r"IFF(\1 IS NOT NULL, \2, \3)",
+        sql,
+        flags=re.IGNORECASE,
+    )
+
+    # Pre-pass: REPLACESTR(case_flag, str, old, new) → REPLACE(str, old, new).
+    # Informatica's first arg is a numeric case-sensitivity flag; Snowflake's
+    # REPLACE doesn't have it, so strip the leading digit argument.
+    sql = re.sub(
+        r"\bREPLACESTR\s*\(\s*\d+\s*,",
+        r"REPLACE(",
+        sql,
+        flags=re.IGNORECASE,
+    )
+    # Fallback: REPLACESTR without leading digit (already 3-arg form)
+    sql = re.sub(
+        r"\bREPLACESTR\s*\(",
+        r"REPLACE(",
+        sql,
+        flags=re.IGNORECASE,
+    )
+
+    # Pre-pass: DECODE(TRUE, cond1, val1, ..., default) → CASE WHEN ... END
+    sql = _convert_decode_true(sql)
+
     # Simple text replacements (case-insensitive, word-boundary aware)
     for old, new in _INFORMATICA_FN.items():
         if old.upper() in sql.upper():

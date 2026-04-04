@@ -26,6 +26,44 @@ from informatica_to_dbt.generator.prompt_builder import PromptPair
 
 logger = logging.getLogger("informatica_dbt")
 
+# Approximate context-window sizes for supported Cortex models (input + output).
+# Conservative estimates; used to guard against silent truncation.
+_MODEL_CONTEXT_LIMITS = {
+    "llama3.1-70b":   128_000,
+    "llama3.1-8b":    128_000,
+    "llama3-70b":     8_000,
+    "llama3-8b":      8_000,
+    "mistral-large2":  128_000,
+    "mistral-large":  32_000,
+    "claude-3-5-sonnet": 200_000,
+    "snowflake-arctic": 4_096,
+}
+_DEFAULT_CONTEXT_LIMIT = 128_000
+_OUTPUT_TOKEN_FLOOR = 2_048   # minimum output tokens to attempt
+
+
+def _estimate_tokens(text: str) -> int:
+    """Rough token estimate — ~4 characters per token."""
+    return max(1, len(text) // 4)
+
+
+def _compute_max_output_tokens(
+    model: str, system_prompt: str, user_prompt: str
+) -> int:
+    """Compute max_tokens for output based on estimated input size and model limit."""
+    ctx = _MODEL_CONTEXT_LIMITS.get(model, _DEFAULT_CONTEXT_LIMIT)
+    input_tokens = _estimate_tokens(system_prompt) + _estimate_tokens(user_prompt)
+    available = ctx - input_tokens
+    if available < _OUTPUT_TOKEN_FLOOR:
+        logger.warning(
+            "Input (~%d tokens) leaves only ~%d output tokens for model %s "
+            "(context limit %d). Output may be truncated.",
+            input_tokens, available, model, ctx,
+        )
+        return _OUTPUT_TOKEN_FLOOR
+    # Cap at 16K — Cortex models may not support higher per-request output
+    return min(16_384, available)
+
 
 def _get_cortex_complete():
     """Lazily import ``snowflake.cortex.complete`` (only available inside Snowflake)."""
@@ -298,6 +336,8 @@ class LLMClient:
 
     def _call_cortex_python(self, prompt: PromptPair) -> str:
         """Call via ``snowflake.cortex.complete()`` Python API with timeout."""
+        max_out = _compute_max_output_tokens(self._model, prompt.system, prompt.user)
+
         def _invoke():
             messages = [
                 {"role": "system", "content": prompt.system},
@@ -308,7 +348,7 @@ class LLMClient:
                 messages,
                 {
                     "temperature": self._temperature,
-                    "max_tokens": 16_384,
+                    "max_tokens": max_out,
                 },
             )
 
@@ -338,6 +378,7 @@ class LLMClient:
         Uses bind parameters to safely pass JSON content that may contain
         newlines, quotes, backslashes, and other special characters.
         """
+        max_out = _compute_max_output_tokens(self._model, prompt.system, prompt.user)
         try:
             messages = [
                 {"role": "system", "content": prompt.system},
@@ -346,7 +387,7 @@ class LLMClient:
             messages_json = json.dumps(messages)
             options_json = json.dumps({
                 "temperature": self._temperature,
-                "max_tokens": 16_384,
+                "max_tokens": max_out,
             })
 
             sql = (

@@ -190,6 +190,9 @@ def enrich_repository(repo: Repository) -> List[EnrichedMapping]:
         for mapping in folder.mappings:
             enriched = enrich_mapping(mapping, folder, index)
             results.append(enriched)
+        for mapping in folder.mapplets:
+            enriched = enrich_mapping(mapping, folder, index)
+            results.append(enriched)
 
     logger.info(
         "Repository '%s': enriched %d mappings from %d non-shared folders",

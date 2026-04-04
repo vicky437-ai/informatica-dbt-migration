@@ -149,6 +149,7 @@ class Folder:
     targets: List[Target] = field(default_factory=list)
     transformations: List[Transformation] = field(default_factory=list)
     mappings: List[Mapping] = field(default_factory=list)
+    mapplets: List[Mapping] = field(default_factory=list)
     shortcuts: List[Shortcut] = field(default_factory=list)
     tasks: List[Task] = field(default_factory=list)
     session_configs: List[SessionConfig] = field(default_factory=list)

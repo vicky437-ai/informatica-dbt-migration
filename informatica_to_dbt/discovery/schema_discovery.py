@@ -17,7 +17,21 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import re
+
 logger = logging.getLogger("informatica_dbt")
+
+
+def _sanitize_identifier(name: str) -> str:
+    """Strip characters that are not valid in Snowflake identifiers.
+
+    Prevents SQL injection by allowing only alphanumeric, underscore,
+    and dollar-sign characters.  Raises ValueError on empty result.
+    """
+    cleaned = re.sub(r"[^A-Za-z0-9_$]", "", name)
+    if not cleaned:
+        raise ValueError(f"Invalid Snowflake identifier: {name!r}")
+    return cleaned
 
 
 @dataclass
@@ -97,11 +111,14 @@ class SchemaDiscovery:
         """
         discovery = cls()
 
+        safe_db = _sanitize_identifier(database)
+        safe_schema = _sanitize_identifier(schema)
+
         query = (
             f"SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, "
             f"CHARACTER_MAXIMUM_LENGTH, NUMERIC_PRECISION, NUMERIC_SCALE "
-            f"FROM {database}.INFORMATION_SCHEMA.COLUMNS "
-            f"WHERE TABLE_SCHEMA = '{schema}' "
+            f"FROM {safe_db}.INFORMATION_SCHEMA.COLUMNS "
+            f"WHERE TABLE_SCHEMA = '{safe_schema}' "
             f"ORDER BY TABLE_NAME, ORDINAL_POSITION"
         )
 

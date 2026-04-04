@@ -19,15 +19,17 @@ Cache structure on disk::
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import logging
 import os
 import shutil
 import time
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Generator, List, Optional
 
 from informatica_to_dbt.generator.response_parser import GeneratedFile
 
@@ -69,6 +71,28 @@ class ConversionCache:
     def __init__(self, cache_dir: str = ".infa2dbt/cache", enabled: bool = True):
         self._cache_dir = Path(cache_dir)
         self._enabled = enabled
+
+    @contextmanager
+    def _entry_lock(self, cache_key: str) -> Generator[None, None, None]:
+        """Acquire an exclusive file lock for a cache entry.
+
+        Creates a ``.lock`` file alongside the entry directory.  The lock is
+        released automatically when the context manager exits.
+        """
+        self._cache_dir.mkdir(parents=True, exist_ok=True)
+        lock_path = self._cache_dir / f"{cache_key}.lock"
+        fd = open(lock_path, "w")
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            fd.close()
+            # Best-effort cleanup — another process may recreate immediately
+            try:
+                lock_path.unlink()
+            except OSError:
+                pass
 
     @property
     def enabled(self) -> bool:
@@ -117,41 +141,42 @@ class ConversionCache:
         if not self._enabled:
             return None
 
-        entry_dir = self._cache_dir / cache_key
-        meta_path = entry_dir / "metadata.json"
-        files_dir = entry_dir / "files"
+        with self._entry_lock(cache_key):
+            entry_dir = self._cache_dir / cache_key
+            meta_path = entry_dir / "metadata.json"
+            files_dir = entry_dir / "files"
 
-        if not meta_path.exists() or not files_dir.exists():
-            return None
+            if not meta_path.exists() or not files_dir.exists():
+                return None
 
-        try:
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            entry = CacheEntry.from_dict(meta)
-        except (json.JSONDecodeError, TypeError, KeyError) as exc:
-            logger.warning("Corrupt cache metadata for %s: %s", cache_key[:12], exc)
-            return None
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                entry = CacheEntry.from_dict(meta)
+            except (json.JSONDecodeError, TypeError, KeyError) as exc:
+                logger.warning("Corrupt cache metadata for %s: %s", cache_key[:12], exc)
+                return None
 
-        # Reconstruct GeneratedFile list from the files/ directory
-        generated: List[GeneratedFile] = []
-        for root, _dirs, filenames in os.walk(files_dir):
-            for fname in filenames:
-                abs_path = Path(root) / fname
-                rel_path = str(abs_path.relative_to(files_dir))
-                content = abs_path.read_text(encoding="utf-8")
-                generated.append(GeneratedFile(path=rel_path, content=content))
+            # Reconstruct GeneratedFile list from the files/ directory
+            generated: List[GeneratedFile] = []
+            for root, _dirs, filenames in os.walk(files_dir):
+                for fname in filenames:
+                    abs_path = Path(root) / fname
+                    rel_path = str(abs_path.relative_to(files_dir))
+                    content = abs_path.read_text(encoding="utf-8")
+                    generated.append(GeneratedFile(path=rel_path, content=content))
 
-        if len(generated) != entry.file_count:
-            logger.warning(
-                "Cache %s: expected %d files but found %d — treating as miss",
-                cache_key[:12], entry.file_count, len(generated),
+            if len(generated) != entry.file_count:
+                logger.warning(
+                    "Cache %s: expected %d files but found %d — treating as miss",
+                    cache_key[:12], entry.file_count, len(generated),
+                )
+                return None
+
+            logger.info(
+                "Cache HIT for %s (%s, %d files)",
+                cache_key[:12], entry.xml_filename, len(generated),
             )
-            return None
-
-        logger.info(
-            "Cache HIT for %s (%s, %d files)",
-            cache_key[:12], entry.xml_filename, len(generated),
-        )
-        return generated
+            return generated
 
     # ------------------------------------------------------------------
     # Store
@@ -181,40 +206,41 @@ class ConversionCache:
         if not self._enabled:
             return
 
-        entry_dir = self._cache_dir / cache_key
-        files_dir = entry_dir / "files"
+        with self._entry_lock(cache_key):
+            entry_dir = self._cache_dir / cache_key
+            files_dir = entry_dir / "files"
 
-        # Clean any partial previous entry
-        if entry_dir.exists():
-            shutil.rmtree(entry_dir)
+            # Clean any partial previous entry
+            if entry_dir.exists():
+                shutil.rmtree(entry_dir)
 
-        files_dir.mkdir(parents=True, exist_ok=True)
+            files_dir.mkdir(parents=True, exist_ok=True)
 
-        # Write each GeneratedFile
-        for gf in files:
-            out_path = files_dir / gf.path
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(gf.content, encoding="utf-8")
+            # Write each GeneratedFile
+            for gf in files:
+                out_path = files_dir / gf.path
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text(gf.content, encoding="utf-8")
 
-        # Write metadata
-        entry = CacheEntry(
-            cache_key=cache_key,
-            xml_filename=xml_filename,
-            mapping_name=mapping_name,
-            converter_version=converter_version,
-            llm_model=llm_model,
-            quality_score=quality_score,
-            file_count=len(files),
-        )
-        meta_path = entry_dir / "metadata.json"
-        meta_path.write_text(
-            json.dumps(entry.to_dict(), indent=2), encoding="utf-8"
-        )
+            # Write metadata
+            entry = CacheEntry(
+                cache_key=cache_key,
+                xml_filename=xml_filename,
+                mapping_name=mapping_name,
+                converter_version=converter_version,
+                llm_model=llm_model,
+                quality_score=quality_score,
+                file_count=len(files),
+            )
+            meta_path = entry_dir / "metadata.json"
+            meta_path.write_text(
+                json.dumps(entry.to_dict(), indent=2), encoding="utf-8"
+            )
 
-        logger.info(
-            "Cache STORE for %s (%s, %d files)",
-            cache_key[:12], xml_filename, len(files),
-        )
+            logger.info(
+                "Cache STORE for %s (%s, %d files)",
+                cache_key[:12], xml_filename, len(files),
+            )
 
     # ------------------------------------------------------------------
     # Management

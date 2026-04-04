@@ -263,6 +263,7 @@ def _parse_folder(el: Element) -> Folder:
     folder.shortcuts = [_parse_shortcut(s) for s in el.findall("SHORTCUT")]
     folder.tasks = [_parse_task(t) for t in el.findall("TASK")]
     folder.mappings = [_parse_mapping(m) for m in el.findall("MAPPING")]
+    folder.mapplets = [_parse_mapping(m) for m in el.findall("MAPPLET")]
 
     # Extract session configs from any workflow in this folder
     for wf in el.findall("WORKFLOW"):
@@ -335,14 +336,16 @@ class InformaticaXMLParser:
                 folder.name,
                 len(folder.sources),
                 len(folder.targets),
-                len(folder.mappings),
+                len(folder.mappings) + len(folder.mapplets),
                 len(folder.transformations),
                 len(folder.shortcuts),
             )
 
-        total_mappings = sum(len(f.mappings) for f in repo.folders)
+        total_mappings = sum(len(f.mappings) + len(f.mapplets) for f in repo.folders)
         total_transforms = sum(
-            len(f.transformations) + sum(len(m.transformations) for m in f.mappings)
+            len(f.transformations)
+            + sum(len(m.transformations) for m in f.mappings)
+            + sum(len(m.transformations) for m in f.mapplets)
             for f in repo.folders
         )
         logger.info(
