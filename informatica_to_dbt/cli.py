@@ -278,13 +278,28 @@ def convert(
     click.echo(pipeline_result.report)
 
     # Generate EWI assessment report
+    # Write JSON first (uses read-merge-write to accumulate across runs),
+    # then re-read merged JSON to generate HTML with ALL mappings (C2 fix).
     from informatica_to_dbt.reports.ewi_report import EWIReportGenerator
     ewi_gen = EWIReportGenerator()
     ewi_report = ewi_gen.generate(combined_metrics)
     report_dir = Path(output_path) / "reports"
     report_dir.mkdir(parents=True, exist_ok=True)
-    html_path = ewi_gen.write_html(ewi_report, str(report_dir / "ewi_assessment_report.html"))
     json_path = ewi_gen.write_json(ewi_report, str(report_dir / "ewi_assessment_report.json"))
+
+    # Re-read merged JSON and regenerate HTML from accumulated data
+    import json as _ewi_json
+    try:
+        merged_data = _ewi_json.loads(Path(json_path).read_text(encoding="utf-8"))
+        merged_summary = merged_data.get("summary", {})
+        from informatica_to_dbt.metrics import RepositoryMetrics as _RM
+        merged_repo = _RM.from_dict(merged_summary)
+        merged_ewi_report = ewi_gen.generate(merged_repo)
+        html_path = ewi_gen.write_html(merged_ewi_report, str(report_dir / "ewi_assessment_report.html"))
+    except Exception:
+        # Fallback: use current-run report for HTML if merge read fails
+        html_path = ewi_gen.write_html(ewi_report, str(report_dir / "ewi_assessment_report.html"))
+
     click.echo(f"EWI Report (HTML): {html_path}")
     click.echo(f"EWI Report (JSON): {json_path}")
 

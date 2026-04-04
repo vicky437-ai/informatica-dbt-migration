@@ -318,16 +318,27 @@ def convert_mapping(
             )
             _emit(ProgressPhase.GENERATING, f"escalation to {config.llm_fallback_model}")
             try:
-                escalation_prompt = build_prompt(chunks[0], complexity, extra_context)
-                llm_start = time.perf_counter()
-                raw_escalation = llm_client.generate_with_model(
-                    escalation_prompt, config.llm_fallback_model,
-                )
-                metrics.llm_total_seconds += time.perf_counter() - llm_start
-                metrics.llm_calls += 1
+                # Re-generate ALL chunks with the fallback model (H6 fix).
+                # Previously only chunks[0] was sent, losing data for
+                # multi-chunk mappings.
+                esc_all_chunk_files: List[List[GeneratedFile]] = []
+                for chunk in chunks:
+                    escalation_prompt = build_prompt(chunk, complexity, extra_context)
+                    llm_start = time.perf_counter()
+                    raw_escalation = llm_client.generate_with_model(
+                        escalation_prompt, config.llm_fallback_model,
+                    )
+                    metrics.llm_total_seconds += time.perf_counter() - llm_start
+                    metrics.llm_calls += 1
+                    esc_all_chunk_files.append(parse_response(raw_escalation))
 
-                esc_files = parse_response(raw_escalation)
-                processed_files, warnings = post_process(esc_files)
+                # Merge escalated chunks (same pattern as Step 4)
+                if len(esc_all_chunk_files) > 1:
+                    esc_merged = merge_chunk_files(esc_all_chunk_files)
+                else:
+                    esc_merged = esc_all_chunk_files[0] if esc_all_chunk_files else []
+
+                processed_files, warnings = post_process(esc_merged)
                 result.files = processed_files
                 result.post_processing_warnings = warnings
 

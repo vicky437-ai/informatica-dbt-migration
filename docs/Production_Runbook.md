@@ -175,6 +175,8 @@ pip install dbt-core dbt-snowflake
 dbt --version
 ```
 
+> **Note:** A local dbt installation is optional if you plan to deploy directly to Snowflake using `infa2dbt deploy --mode direct` and execute via `snow dbt execute`. The Snowflake-native dbt runtime handles compilation, model materialization, and testing without a local dbt CLI.
+
 ---
 
 ## Step 6: Prepare Input Files
@@ -332,6 +334,8 @@ infa2dbt git-push \
 | `Cortex LLM timeout` | Large mapping or slow LLM response | Retry the `convert` command; cached results are reused automatically |
 | `dbt test failures` | Source data quality issues | Review test definitions in `_stg__schema.yml`; adjust accepted values or thresholds |
 | `Permission denied on deploy` | Insufficient Snowflake role | Ensure the configured role has `CREATE DATABASE`, `CREATE SCHEMA`, and `USAGE` grants |
+| `TRY_CAST from TIMESTAMP_NTZ to DATE not supported` | `TRY_TO_DATE()` called on a TIMESTAMP_NTZ column | Use `column::DATE` cast instead; the post-processor handles this automatically |
+| `accepted_values` test format error | dbt-fusion 2.0 and Snowflake native dbt-core 1.9.x use incompatible formats | Use the standard format (no `arguments:` wrapper) for Snowflake-native deployment via `snow dbt execute` |
 
 ### Verifying a Successful Run
 

@@ -384,8 +384,20 @@ class InformaticaXMLParser:
             except Exception as exc:
                 logger.warning("lxml parsing failed, falling back to stdlib: %s", exc)
 
-        # stdlib fallback
+        # stdlib fallback — strip DOCTYPE declarations to mitigate XXE attacks
+        # (H1 fix).  stdlib ElementTree's expat parser processes entity
+        # declarations by default; stripping the DOCTYPE block removes any
+        # ENTITY definitions before the parser sees them.
+        # The internal-subset pattern handles ] inside quoted strings
+        # (e.g. <!ENTITY x "a]b">) by consuming "..." and '...' spans.
         try:
-            return _stdlib_ET.fromstring(xml_bytes)
+            import re as _xxe_re
+            cleaned = _xxe_re.sub(
+                rb'<!DOCTYPE[^>\[]*(\[(?:[^\]"\']|"[^"]*"|\'[^\']*\')*\])?\s*>',
+                b'',
+                xml_bytes,
+                flags=_xxe_re.IGNORECASE | _xxe_re.DOTALL,
+            )
+            return _stdlib_ET.fromstring(cleaned)
         except _stdlib_ET.ParseError as exc:
             raise XMLParseError(f"Failed to parse XML: {exc}") from exc

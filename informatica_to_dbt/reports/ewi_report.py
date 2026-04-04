@@ -132,11 +132,70 @@ class EWIReportGenerator:
     def write_json(self, report: EWIReport, output_path: str) -> str:
         """Write the report as a JSON file.
 
+        Uses a read-merge-write pattern: if an existing JSON report is
+        present, mapping entries from prior runs are preserved and new
+        mappings from the current run are merged in (keyed by
+        mapping_name).  This prevents overwriting results from prior
+        runs (C2 fix).
+
         Returns the absolute path to the written file.
         """
         path = Path(output_path).resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(report.to_json(), encoding="utf-8")
+
+        current_data = json.loads(report.to_json())
+
+        # Read existing report and merge mapping-level data
+        if path.exists():
+            try:
+                existing_data = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(existing_data, dict) and "summary" in existing_data:
+                    # Build lookup of existing mappings by name
+                    existing_mappings = {}
+                    for m in existing_data.get("summary", {}).get("mappings", []):
+                        name = m.get("mapping_name", "")
+                        if name:
+                            existing_mappings[name] = m
+
+                    # Build lookup of current mappings
+                    current_mappings = {}
+                    for m in current_data.get("summary", {}).get("mappings", []):
+                        name = m.get("mapping_name", "")
+                        if name:
+                            current_mappings[name] = m
+
+                    # Merge: current overrides existing for same name
+                    existing_mappings.update(current_mappings)
+                    merged_mapping_list = list(existing_mappings.values())
+
+                    # Rebuild summary from merged mappings
+                    from informatica_to_dbt.metrics import RepositoryMetrics, MappingMetrics
+                    merged_repo = RepositoryMetrics(
+                        mapping_metrics=[
+                            MappingMetrics.from_dict(m) for m in merged_mapping_list
+                        ],
+                        total_seconds=sum(
+                            m.get("total_seconds", 0.0) for m in merged_mapping_list
+                        ),
+                    )
+                    current_data["summary"] = merged_repo.to_dict()
+
+                    # Merge EWI items: keep prior items for mappings not in this run
+                    current_mapping_names = set(current_mappings.keys())
+                    existing_items = [
+                        item for item in existing_data.get("items", [])
+                        if item.get("mapping_name", "") not in current_mapping_names
+                    ]
+                    current_data["items"] = existing_items + current_data.get("items", [])
+
+                    logger.debug(
+                        "Merged EWI report: %d total mapping(s) from existing + current",
+                        len(merged_mapping_list),
+                    )
+            except (json.JSONDecodeError, KeyError, TypeError) as exc:
+                logger.warning("Could not parse existing EWI JSON for merge: %s", exc)
+
+        path.write_text(json.dumps(current_data, indent=2), encoding="utf-8")
         logger.info("EWI JSON report written to %s", path)
         return str(path)
 

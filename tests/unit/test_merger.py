@@ -15,7 +15,7 @@ from informatica_to_dbt.merger.conflict_resolver import resolve_conflicts
 from informatica_to_dbt.merger.project_merger import ProjectMerger, MergeResult, _add_marker
 from informatica_to_dbt.merger.source_consolidator import (
     consolidate_sources,
-    _extract_mapping_dir,
+    _extract_layer_dir,
     _merge_table_columns,
 )
 from informatica_to_dbt.orchestrator import MappingResult
@@ -242,10 +242,10 @@ class TestSourceConsolidator:
         # Should return empty since no valid sources found
         assert len(result) == 0
 
-    def test_extract_mapping_dir(self):
-        assert _extract_mapping_dir("models/m_foo/staging/_sources.yml") == "models/m_foo"
-        assert _extract_mapping_dir("models/m_bar/intermediate/schema.yml") == "models/m_bar"
-        assert _extract_mapping_dir("something/else/file.yml") == "something/else"
+    def test_extract_layer_dir(self):
+        assert _extract_layer_dir("models/m_foo/staging/_sources.yml") == "models/m_foo/staging"
+        assert _extract_layer_dir("models/m_bar/intermediate/schema.yml") == "models/m_bar/intermediate"
+        assert _extract_layer_dir("something/else/file.yml") == "something/else"
 
     def test_merge_table_columns(self):
         existing = {"name": "orders", "columns": [{"name": "id"}]}

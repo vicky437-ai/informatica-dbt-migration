@@ -660,6 +660,7 @@ infa2dbt cache clear --yes
 | `docs/CLI_Reference.md` | Full CLI command reference with all flags and examples |
 | `docs/Production_Runbook.md` | Setup guide for running the framework on a new machine |
 | `docs/Technical_Design_Document.md` | Technical deep-dive into parser, LLM generator, validators |
+| `docs/Consolidated_Guide.md` | End-to-end walkthrough covering setup, conversion, deployment, and execution |
 
 ---
 

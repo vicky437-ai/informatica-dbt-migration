@@ -284,7 +284,7 @@ infa2dbt deploy --project <PATH> [OPTIONS]
 ```bash
 # Direct deployment (simplest)
 infa2dbt deploy -p ./my_dbt_project -d MY_DB -s MY_SCHEMA \
-    --connection myconnection
+    -n MY_PROJECT_NAME --connection myconnection
 
 # Git-based deployment
 infa2dbt deploy -p ./my_dbt_project --mode git \

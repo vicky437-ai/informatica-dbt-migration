@@ -21,7 +21,7 @@ INFORMATICA_FN_RE = re.compile(
     r"GET_DATE_PART\s*\(|SET_DATE_PART\s*\(|"
     r"TO_INTEGER\s*\(|TO_BIGINT\s*\(|TO_FLOAT\s*\(|"
     r"SESSSTARTTIME|SYSTIMESTAMP|DECODE\s*\(\s*TRUE|"
-    r"NVL2?\s*\(|\bSYSDATE\b|\bDECODE\s*\("
+    r"NVL2\s*\(|\bSYSDATE\b"
     r")",
     re.IGNORECASE,
 )

@@ -595,6 +595,8 @@ The self-healing loop:
 | `TO_INTEGER(expr)` | `TO_NUMBER(expr)` |
 | `IS_NUMBER(expr)` | `TRY_TO_NUMBER(expr) IS NOT NULL` |
 | `IS_DATE(expr)` | `TRY_TO_DATE(expr) IS NOT NULL` |
+| `TRY_TO_DATE(timestamp_col)` | `timestamp_col::DATE` (TRY_CAST from TIMESTAMP_NTZ to DATE is not supported) |
+| `TRY_TO_NUMBER(x, precision, scale)` on numeric source | Remove precision/scale args; reference column directly if already numeric type |
 
 ### 7.7 Quality Scorer
 
@@ -927,6 +929,8 @@ models:
           - accepted_values:
               values: ['ACTIVE', 'INACTIVE', 'RETIRED']
 ```
+
+> **Compatibility Note:** Snowflake's native dbt runtime (dbt-core 1.9.x, used by `snow dbt execute`) requires the standard `accepted_values` format shown above (no `arguments:` wrapper). dbt-fusion 2.0 requires an `arguments:` wrapper around `values:`. These formats are mutually exclusive — use the standard format for Snowflake-native deployment.
 
 ### 11.3 Validation Pipeline
 

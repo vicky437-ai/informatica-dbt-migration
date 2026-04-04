@@ -265,6 +265,57 @@ def _convert_decode_true(sql: str) -> str:
     return sql
 
 
+_ISNULL_RE = re.compile(r"\bISNULL\s*\(", re.IGNORECASE)
+
+
+def _convert_isnull_boolean(sql: str) -> str:
+    """Convert single-arg ``ISNULL(expr)`` → ``(expr IS NULL)``.
+
+    Uses balanced-paren tracking so nested calls like ``ISNULL(TRIM(X))``
+    are handled correctly (C3 fix).  Multi-arg forms (two+ commas at
+    depth 1) are left alone for the later ISNULL→IFNULL text replacement.
+    """
+    while True:
+        m = _ISNULL_RE.search(sql)
+        if not m:
+            break
+        paren_pos = sql.index("(", m.start())
+        args, end_pos = _split_decode_args(sql, paren_pos)
+        if not args:
+            break
+        if len(args) == 1:
+            # Single-arg boolean form: ISNULL(expr) → (expr IS NULL)
+            sql = sql[:m.start()] + f"({args[0]} IS NULL)" + sql[end_pos:]
+        else:
+            # Multi-arg form (e.g. ISNULL(x, default)) — skip, let text
+            # replacement handle ISNULL( → IFNULL( later.
+            # Advance past this match to avoid infinite loop.
+            break
+    return sql
+
+
+_NVL2_RE = re.compile(r"\bNVL2\s*\(", re.IGNORECASE)
+
+
+def _convert_nvl2(sql: str) -> str:
+    """Convert ``NVL2(expr, not_null_val, null_val)`` → ``IFF(expr IS NOT NULL, ...)``.
+
+    Uses balanced-paren tracking so nested calls like ``NVL2(TRIM(X), a, b)``
+    are handled correctly (C4 fix).
+    """
+    while True:
+        m = _NVL2_RE.search(sql)
+        if not m:
+            break
+        paren_pos = sql.index("(", m.start())
+        args, end_pos = _split_decode_args(sql, paren_pos)
+        if not args or len(args) != 3:
+            break
+        replacement = f"IFF({args[0]} IS NOT NULL, {args[1]}, {args[2]})"
+        sql = sql[:m.start()] + replacement + sql[end_pos:]
+    return sql
+
+
 def _fix_informatica_residuals(sql: str) -> str:
     """Replace leftover Informatica function names and patterns.
 
@@ -274,22 +325,13 @@ def _fix_informatica_residuals(sql: str) -> str:
     """
     # Pre-pass: convert single-arg ISNULL(expr) boolean form → (expr IS NULL).
     # This must run BEFORE the simple-text loop which converts ISNULL( → IFNULL(.
-    # Only matches when there is no comma inside (i.e. single argument).
-    sql = re.sub(
-        r"\bISNULL\s*\(\s*([^,()]+?)\s*\)",
-        r"(\1 IS NULL)",
-        sql,
-        flags=re.IGNORECASE,
-    )
+    # Uses balanced-paren matching to handle nested calls like ISNULL(TRIM(X)).
+    sql = _convert_isnull_boolean(sql)
 
     # Pre-pass: NVL2(expr, not_null_val, null_val) → IFF(expr IS NOT NULL, ..., ...)
     # Must run BEFORE simple-text loop which maps NVL( → COALESCE( (would match NVL2 prefix).
-    sql = re.sub(
-        r"\bNVL2\s*\(\s*([^,()]+?)\s*,\s*([^,()]+?)\s*,\s*([^,()]+?)\s*\)",
-        r"IFF(\1 IS NOT NULL, \2, \3)",
-        sql,
-        flags=re.IGNORECASE,
-    )
+    # Uses balanced-paren matching to handle nested calls like NVL2(TRIM(X), a, b).
+    sql = _convert_nvl2(sql)
 
     # Pre-pass: REPLACESTR(case_flag, str, old, new) → REPLACE(str, old, new).
     # Informatica's first arg is a numeric case-sensitivity flag; Snowflake's
@@ -318,7 +360,16 @@ def _fix_informatica_residuals(sql: str) -> str:
             # before the function name to avoid partial matches inside identifiers.
             fn_name = old.rstrip("(")
             if old.endswith("("):
-                pattern = re.compile(r"\b" + re.escape(fn_name) + r"\s*\(", re.IGNORECASE)
+                # Use negative lookahead (?!\w) after the function name to
+                # prevent prefix-ambiguous matches (e.g. NVL must not match
+                # NVL2).  This is defence-in-depth: \bNVL\s*\( already cannot
+                # match NVL2( because \s*\( requires whitespace-then-paren,
+                # but the lookahead makes intent explicit and guards against
+                # future regex changes (M1 fix).
+                pattern = re.compile(
+                    r"\b" + re.escape(fn_name) + r"(?!\w)\s*\(",
+                    re.IGNORECASE,
+                )
                 sql = pattern.sub(new, sql)
             else:
                 # Non-function tokens (e.g. SYSTIMESTAMP, SYSDATE)

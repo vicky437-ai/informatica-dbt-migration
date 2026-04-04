@@ -281,10 +281,15 @@ class ProjectMerger:
     # ------------------------------------------------------------------
 
     def _write_project_yml(self, mapping_results: List, result: MergeResult) -> None:
-        """Generate a unified dbt_project.yml covering all mappings."""
-        # Detect which layers exist per mapping
-        mapping_layers: Dict[str, Set[str]] = {}
-        has_incremental = False
+        """Generate a unified dbt_project.yml covering all mappings.
+
+        Uses a read-merge-write pattern: if an existing dbt_project.yml is
+        present, its mapping configurations are preserved and new mappings
+        from the current run are merged in.  This prevents overwriting
+        configs from prior runs (C1 fix).
+        """
+        # Detect which layers exist per mapping in THIS run
+        new_mapping_layers: Dict[str, Set[str]] = {}
         for mr in mapping_results:
             if mr.status == "failed" or not mr.files:
                 continue
@@ -294,9 +299,40 @@ class ProjectMerger:
                     layer = gf.layer
                     if layer in ("staging", "intermediate", "marts"):
                         layers.add(layer)
-                    if "materialized='incremental'" in gf.content:
-                        has_incremental = True
-            mapping_layers[mr.mapping_name] = layers
+            new_mapping_layers[mr.mapping_name] = layers
+
+        # Read existing dbt_project.yml to preserve prior mapping configs
+        existing_mapping_layers: Dict[str, Set[str]] = {}
+        out_path = self._project_dir / "dbt_project.yml"
+        if out_path.exists():
+            try:
+                existing_data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+                if isinstance(existing_data, dict):
+                    models_section = existing_data.get("models", {})
+                    project_models = models_section.get(self._project_name, {})
+                    if isinstance(project_models, dict):
+                        for mapping_name, mapping_cfg in project_models.items():
+                            if not isinstance(mapping_cfg, dict):
+                                continue
+                            layers: Set[str] = set()
+                            for layer_name in ("staging", "intermediate", "marts"):
+                                if layer_name in mapping_cfg:
+                                    layers.add(layer_name)
+                            existing_mapping_layers[mapping_name] = layers
+                logger.debug(
+                    "Read %d existing mapping config(s) from dbt_project.yml",
+                    len(existing_mapping_layers),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Could not parse existing dbt_project.yml for merge: %s", exc
+                )
+
+        # Merge: new mappings override existing ones with same name;
+        # existing mappings not in current run are preserved.
+        merged_mapping_layers: Dict[str, Set[str]] = {}
+        merged_mapping_layers.update(existing_mapping_layers)
+        merged_mapping_layers.update(new_mapping_layers)
 
         lines = [
             f"# {_GENERATED_MARKER}",
@@ -323,8 +359,8 @@ class ProjectMerger:
         ]
 
         # Per-mapping config blocks with tags and layer materializations
-        for mapping_name in sorted(mapping_layers.keys()):
-            layers = mapping_layers[mapping_name]
+        for mapping_name in sorted(merged_mapping_layers.keys()):
+            layers = merged_mapping_layers[mapping_name]
             lines.append(f"    {mapping_name}:")
             lines.append(f"      +tags: ['{mapping_name}']")
             if "staging" in layers:
@@ -338,10 +374,9 @@ class ProjectMerger:
                 lines.append("        +materialized: table")
 
         content = "\n".join(lines) + "\n"
-        out_path = self._project_dir / "dbt_project.yml"
         out_path.write_text(content, encoding="utf-8")
         result.files_written += 1
-        logger.info("Wrote unified dbt_project.yml")
+        logger.info("Wrote unified dbt_project.yml (%d mapping(s))", len(merged_mapping_layers))
 
     def _write_packages_yml(self, mapping_results: List, result: MergeResult) -> None:
         """Generate a unified packages.yml from all mapping outputs."""

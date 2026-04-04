@@ -114,16 +114,29 @@ class SchemaDiscovery:
         safe_db = _sanitize_identifier(database)
         safe_schema = _sanitize_identifier(schema)
 
+        # Use a parameterized query for the WHERE clause value to avoid
+        # SQL injection via string interpolation.  The database/schema
+        # identifiers in the FROM clause cannot use bind parameters, but
+        # _sanitize_identifier() strips everything except [A-Za-z0-9_$]
+        # so they are safe for interpolation (M2 fix).
         query = (
             f"SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, "
             f"CHARACTER_MAXIMUM_LENGTH, NUMERIC_PRECISION, NUMERIC_SCALE "
             f"FROM {safe_db}.INFORMATION_SCHEMA.COLUMNS "
-            f"WHERE TABLE_SCHEMA = '{safe_schema}' "
+            f"WHERE TABLE_SCHEMA = ? "
             f"ORDER BY TABLE_NAME, ORDINAL_POSITION"
         )
 
         try:
-            rows = session.sql(query).collect()
+            cursor = session.connection.cursor()
+            try:
+                cursor.execute(query, (safe_schema,))
+                rows = cursor.fetchall()
+                # Map positional results to dict-like access expected below
+                col_names = [desc[0] for desc in cursor.description]
+                rows = [dict(zip(col_names, row)) for row in rows]
+            finally:
+                cursor.close()
         except Exception as exc:
             logger.error("Schema discovery query failed: %s", exc)
             return discovery

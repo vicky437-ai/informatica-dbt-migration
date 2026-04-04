@@ -188,9 +188,22 @@ def _build_shared_context(enriched: EnrichedMapping) -> str:
 def _collect_chain_objects(
     mapping: Mapping,
     chain_instance_names: List[str],
+    connector_scope: Optional[List[str]] = None,
 ) -> tuple[List[Transformation], List[Instance], List[Connector]]:
-    """Collect transformations, instances, and connectors relevant to a set of chains."""
+    """Collect transformations, instances, and connectors relevant to a set of chains.
+
+    Args:
+        mapping: The mapping to collect from.
+        chain_instance_names: Instance names for this chunk.
+        connector_scope: If provided, include connectors where at least one
+            end is in ``chain_instance_names`` AND the other end is in
+            ``connector_scope``.  This preserves inter-sub-chain connectors
+            when a parent chain is split into sub-groups (H5 fix).
+            When ``None``, only connectors where **both** ends are in
+            ``chain_instance_names`` are included (original behaviour).
+    """
     chain_set = set(chain_instance_names)
+    scope_set = set(connector_scope) if connector_scope else None
 
     # Map instance name → transformation name
     inst_tx_names = set()
@@ -206,11 +219,22 @@ def _collect_chain_objects(
         if tx.name in inst_tx_names:
             relevant_transforms.append(tx)
 
-    # Connectors where both ends are in the chain set
+    # Connectors
     relevant_connectors: List[Connector] = []
     for conn in mapping.connectors:
-        if conn.from_instance in chain_set and conn.to_instance in chain_set:
-            relevant_connectors.append(conn)
+        if scope_set is not None:
+            # Sub-chain mode: include connector if at least one end is in
+            # this sub-group AND the other end is in the parent chain scope.
+            from_in = conn.from_instance in chain_set
+            to_in = conn.to_instance in chain_set
+            from_scope = conn.from_instance in scope_set
+            to_scope = conn.to_instance in scope_set
+            if (from_in or to_in) and (from_scope and to_scope):
+                relevant_connectors.append(conn)
+        else:
+            # Normal mode: both ends must be in the chain set
+            if conn.from_instance in chain_set and conn.to_instance in chain_set:
+                relevant_connectors.append(conn)
 
     return relevant_transforms, relevant_instances, relevant_connectors
 
@@ -219,13 +243,20 @@ def _serialize_chain_body(
     mapping: Mapping,
     chain_instance_names: List[str],
     compact: bool = False,
+    connector_scope: Optional[List[str]] = None,
 ) -> str:
     """Serialize the transformations, instances, and connectors for a set of chains.
 
     When *compact* is ``True``, LOW-priority transformations are serialized
     in compact mode (fewer ports, only critical attributes).
+
+    When *connector_scope* is provided, it is passed to
+    :func:`_collect_chain_objects` to preserve boundary connectors during
+    sub-chain splitting (H5 fix).
     """
-    transforms, instances, connectors = _collect_chain_objects(mapping, chain_instance_names)
+    transforms, instances, connectors = _collect_chain_objects(
+        mapping, chain_instance_names, connector_scope=connector_scope,
+    )
 
     lines: List[str] = []
 
@@ -345,10 +376,10 @@ def chunk_mapping(
             sub_tokens = 0
             part = 0
             for inst_name in chain:
-                inst_body = _serialize_chain_body(mapping, [inst_name])
+                inst_body = _serialize_chain_body(mapping, [inst_name], connector_scope=chain)
                 inst_tokens = estimate_token_count(inst_body)
                 if sub_group and sub_tokens + inst_tokens > available:
-                    chain_bodies.append(_serialize_chain_body(mapping, sub_group))
+                    chain_bodies.append(_serialize_chain_body(mapping, sub_group, connector_scope=chain))
                     chain_tokens.append(sub_tokens)
                     chain_labels_raw.append(f"chain_{ci}_part{part}")
                     part += 1
@@ -358,7 +389,7 @@ def chunk_mapping(
                     sub_group.append(inst_name)
                     sub_tokens += inst_tokens
             if sub_group:
-                chain_bodies.append(_serialize_chain_body(mapping, sub_group))
+                chain_bodies.append(_serialize_chain_body(mapping, sub_group, connector_scope=chain))
                 chain_tokens.append(estimate_token_count(chain_bodies[-1]))
                 chain_labels_raw.append(f"chain_{ci}_part{part}")
 
